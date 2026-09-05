@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { Card, PillButton } from "@/components/Card";
 import { StatusDot, RISK_CONFIG, VERDICT_CONFIG } from "@/components/StatusBadge";
+import TrendingSection from "@/components/TrendingSection";
 import {
   getSessionId,
   getHistory,
@@ -122,6 +123,8 @@ export default function HomePage() {
           </PillButton>
         </form>
       </Card>
+
+      <TrendingSection />
 
       <div className="grid grid-cols-2 gap-3 mb-6">
         <Card className="opacity-50">

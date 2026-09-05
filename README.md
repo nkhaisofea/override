@@ -10,7 +10,10 @@ Built for Hackathon Sedia! 2026 (SDG 3 — Good Health & Well-being).
   Vitaura checks it against a curated set of trusted health sources → returns a verdict
   (**true / false / misleading / unverified**) with a plain-language explanation and a cited
   source. Every check gets a shareable permalink and is logged to a per-device history
-  (risk portfolio + recent checks), all without an account.
+  (risk portfolio + recent checks), all without an account. The homepage also surfaces a
+  **"Trending right now"** feed — claims that either enough distinct people asked about
+  recently (auto-detected, no external social-media API needed) or that an admin manually
+  spotlighted — so there's something worth browsing even before you paste your own claim.
 - **Admin side (login required):** a dashboard of check volume and verdict breakdown, full
   CRUD on the trusted sources the AI is grounded in, full CRUD on FAQ posts (plus
   auto-drafted FAQ posts when enough people ask about the same thing), and a claims log
@@ -77,10 +80,20 @@ The AI's verdicts are only as good as what's in the `sources` collection. Add a 
 MOH/WHO-style entries from `/admin/sources` once you're logged in — each one is embedded on
 save so it's immediately usable for matching.
 
+### Seeding the "Trending right now" feed for a demo
+
+The homepage trending feed normally fills itself in once 5+ distinct sessions ask about the
+same claim within 24h (see `lib/autoFaq.js`) — but that needs real traffic you won't have
+before judging. To fake a realistic homepage for the demo, go to `/admin/faq`, add a post
+about a real viral myth (e.g. "pineapple cures cancer"), set a **verdict**, and check
+**"Feature as Trending"**. It'll show up immediately in the feed, same as an auto-detected one.
+
 ## Project structure
 
 - `src/app/` — pages and API routes (App Router)
   - `src/app/page.js`, `src/app/result/[id]/` — the public check flow
+  - `src/components/TrendingSection.js`, `src/app/api/trending/` — the "Trending right now"
+    homepage feed
   - `src/app/faq/` — public FAQ browsing
   - `src/app/admin/login/` — admin sign-in (public)
   - `src/app/admin/(protected)/` — dashboard, sources, FAQ, and claims-log admin pages
@@ -106,3 +119,9 @@ save so it's immediately usable for matching.
   reason and admin identity recorded on the claim.
 - **No login friction for the people who need this most:** the actual fact-checking flow
   requires zero signup — anyone forwarded a suspicious message can verify it in seconds.
+- **Virality as a detection signal, not a liability:** instead of scraping social media (X's
+  API dropped its free tier in 2026; TikTok/Meta require lengthy app review — not viable on a
+  hackathon timeline), the "Trending right now" feed treats *our own usage data* as the
+  signal: when several distinct people independently ask about the same claim in a short
+  window, that's a real-time proxy for "this is going viral," surfaced without any external
+  dependency.
