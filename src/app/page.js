@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Logo, LivePulse } from "@/components/Logo";
@@ -44,9 +44,28 @@ export default function HomePage() {
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState("");
   const [history, setHistory] = useState([]);
+  const [historyQuery, setHistoryQuery] = useState("");
   const [portfolio, setPortfolio] = useState({ safe: 0, caution: 0, high_risk: 0 });
 
   const textareaRef = useRef(null);
+
+  // Searching recent checks matches the claim text AND the verdict/risk labels,
+  // so "dengue", "false" and "high risk" are all useful queries — people
+  // looking back through their history tend to remember the outcome ("what was
+  // that one that came back false?") rather than the exact wording they pasted.
+  const filteredHistory = useMemo(() => {
+    const q = historyQuery.trim().toLowerCase();
+    if (!q) return history;
+    return history.filter((item) => {
+      const verdict = VERDICT_CONFIG[item.verdict]?.label || "";
+      const risk = RISK_CONFIG[item.riskLevel]?.label || "";
+      // Risk labels are stored as HIGH RISK / high_risk in different places;
+      // include both spellings so either way of typing it matches.
+      return `${item.claim} ${verdict} ${risk} ${item.riskLevel} ${item.verdict}`
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [history, historyQuery]);
 
   // Voice input appends to whatever is already in the box, so a user can
   // dictate, then correct a word by hand.
@@ -365,9 +384,44 @@ export default function HomePage() {
 
           {history.length > 0 ? (
             <>
-              <SectionLabel className="mb-2">Recent checks</SectionLabel>
+              <div className="mb-2 flex items-baseline justify-between gap-2">
+                <SectionLabel>Recent checks</SectionLabel>
+                {historyQuery.trim() && (
+                  <span className="label-tracked text-[10px] text-faint">
+                    {filteredHistory.length} of {history.length}
+                  </span>
+                )}
+              </div>
+
+              {/* Only worth a search box once there's enough history that
+                  scanning the list stops being faster than typing. */}
+              {history.length > 3 && (
+                <div className="relative mb-2">
+                  <label htmlFor="history-search" className="sr-only">
+                    Search your recent checks
+                  </label>
+                  <input
+                    id="history-search"
+                    type="search"
+                    value={historyQuery}
+                    onChange={(e) => setHistoryQuery(e.target.value)}
+                    placeholder="Search your checks…"
+                    className="field rounded-full py-2.5 pr-16 text-xs"
+                  />
+                  {historyQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setHistoryQuery("")}
+                      className="label-tracked absolute inset-y-0 right-0 px-4 text-[10px] text-faint transition-colors hover:text-accent"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              )}
+
               <div className="flex flex-col gap-2">
-                {history.slice(0, 10).map((item) => (
+                {filteredHistory.slice(0, 10).map((item) => (
                   <InteractiveCard
                     key={item.id}
                     as="button"
@@ -387,6 +441,14 @@ export default function HomePage() {
                   </InteractiveCard>
                 ))}
               </div>
+
+              {filteredHistory.length === 0 && (
+                <Card className="text-center">
+                  <p className="text-xs leading-relaxed text-muted">
+                    No checks match &ldquo;{historyQuery.trim()}&rdquo;.
+                  </p>
+                </Card>
+              )}
             </>
           ) : (
             <Card className="text-center">
@@ -396,13 +458,37 @@ export default function HomePage() {
             </Card>
           )}
 
-          <div className="mt-8 text-center sm:hidden">
-            <Link href="/faq" className="text-xs text-muted underline">
-              Browse health FAQs
-            </Link>
-          </div>
         </aside>
       </div>
+
+      {/* Site footer. The admin entrance lives here rather than in the header:
+          it's for one or two people, not the public, so it shouldn't compete
+          with the check flow — but it does need to be findable without
+          knowing to type /admin by hand. */}
+      <footer className="mt-12 border-t border-border pt-6">
+        <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
+          <p className="text-[11px] text-faint">
+            Vitaura — verify health claims before you trust, act, or share.
+          </p>
+          <nav className="flex items-center gap-4">
+            <Link
+              href="/faq"
+              className="label-tracked text-[10px] text-muted transition-colors hover:text-accent"
+            >
+              Health FAQs
+            </Link>
+            <span className="text-faint" aria-hidden="true">
+              ·
+            </span>
+            <Link
+              href="/admin/login"
+              className="label-tracked text-[10px] text-muted transition-colors hover:text-accent"
+            >
+              Admin
+            </Link>
+          </nav>
+        </div>
+      </footer>
     </main>
   );
 }
