@@ -19,12 +19,16 @@ const LANGUAGES = [
   { code: "zh", label: "中文" },
 ];
 
+const MAX_SCAN_BYTES = 8 * 1024 * 1024; // 8MB — generous for a phone screenshot
+
 export default function HomePage() {
   const router = useRouter();
   const [text, setText] = useState("");
   const [language, setLanguage] = useState("en");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanError, setScanError] = useState("");
   const [history, setHistory] = useState([]);
   const [portfolio, setPortfolio] = useState({ safe: 0, caution: 0, high_risk: 0 });
 
@@ -68,6 +72,63 @@ export default function HomePage() {
     }
   }
 
+  function handleScanFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file || scanLoading) return;
+
+    setScanError("");
+    if (!file.type.startsWith("image/")) {
+      setScanError("Please choose an image file.");
+      return;
+    }
+    if (file.size > MAX_SCAN_BYTES) {
+      setScanError("That image is too large — try a smaller screenshot.");
+      return;
+    }
+
+    setScanLoading(true);
+    const reader = new FileReader();
+    reader.onerror = () => {
+      setScanError("Couldn't read that file. Please try again.");
+      setScanLoading(false);
+    };
+    reader.onload = async () => {
+      try {
+        // reader.result is "data:image/png;base64,AAAA..." — strip the prefix.
+        const imageBase64 = String(reader.result).split(",")[1] || "";
+        const res = await fetch("/api/claims/check-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageBase64,
+            mimeType: file.type,
+            language,
+            sessionId: getSessionId(),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setScanError(data.error || "Something went wrong. Please try again.");
+          return;
+        }
+        addToHistory({
+          id: data.id,
+          claim: data.claim,
+          verdict: data.verdict,
+          riskLevel: data.riskLevel,
+          createdAt: new Date().toISOString(),
+        });
+        router.push(`/result/${data.id}`);
+      } catch {
+        setScanError("Couldn't reach the server. Check your connection and try again.");
+      } finally {
+        setScanLoading(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
   return (
     <main className="mx-auto max-w-md px-5 pb-16 pt-8">
       <header className="flex items-center justify-between mb-8">
@@ -78,7 +139,7 @@ export default function HomePage() {
         </span>
       </header>
 
-      <h1 className="text-2xl font-semibold mb-1">Your health reality layer</h1>
+      <h1 className="font-display text-2xl font-semibold mb-1">Your health reality layer</h1>
       <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>
         What did you receive? Check it before you trust, act, or share.
       </p>
@@ -126,23 +187,39 @@ export default function HomePage() {
 
       <TrendingSection />
 
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        <Card className="opacity-50">
-          <p className="label-tracked text-xs mb-2" style={{ color: "var(--muted)" }}>
-            Reality Scan
+      <div className="mb-6">
+        <div className="grid grid-cols-2 gap-3">
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleScanFile}
+              disabled={scanLoading}
+              className="sr-only"
+            />
+            <Card className={scanLoading ? "opacity-70" : ""}>
+              <p className="label-tracked text-xs mb-2" style={{ color: "var(--accent)" }}>
+                Reality Scan
+              </p>
+              <p className="text-xs" style={{ color: "var(--muted)" }}>
+                {scanLoading ? "Reading screenshot…" : "Upload a screenshot to check"}
+              </p>
+            </Card>
+          </label>
+          <Card className="opacity-50">
+            <p className="label-tracked text-xs mb-2" style={{ color: "var(--muted)" }}>
+              Ask Vitaura
+            </p>
+            <p className="text-xs" style={{ color: "var(--muted)" }}>
+              Voice input — coming soon
+            </p>
+          </Card>
+        </div>
+        {scanError && (
+          <p className="text-xs mt-2" style={{ color: "var(--danger)" }}>
+            {scanError}
           </p>
-          <p className="text-xs" style={{ color: "var(--muted)" }}>
-            Scan a screenshot — coming soon
-          </p>
-        </Card>
-        <Card className="opacity-50">
-          <p className="label-tracked text-xs mb-2" style={{ color: "var(--muted)" }}>
-            Ask Vitaura
-          </p>
-          <p className="text-xs" style={{ color: "var(--muted)" }}>
-            Voice input — coming soon
-          </p>
-        </Card>
+        )}
       </div>
 
       <p className="label-tracked text-xs mb-2" style={{ color: "var(--muted)" }}>
@@ -151,7 +228,7 @@ export default function HomePage() {
       <div className="grid grid-cols-3 gap-3 mb-8">
         {["safe", "caution", "high_risk"].map((key) => (
           <Card key={key} className="text-center">
-            <p className="text-2xl font-semibold" style={{ color: RISK_CONFIG[key].color }}>
+            <p className="font-display text-2xl font-semibold" style={{ color: RISK_CONFIG[key].color }}>
               {portfolio[key]}
             </p>
             <p className="label-tracked text-[10px] mt-1" style={{ color: "var(--muted)" }}>

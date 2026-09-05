@@ -25,6 +25,8 @@ export async function GET(request) {
         language: c.language,
         verdict: c.verdict,
         riskLevel: c.riskLevel,
+        evidenceConfidence: c.evidenceConfidence ?? null,
+        actionRisk: c.actionRisk ?? null,
         explanation: c.explanation,
         sourceCitation: c.sourceCitation,
         overriddenBy: c.overriddenBy,

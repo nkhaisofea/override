@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card, PillButton } from "@/components/Card";
 import { VerdictBadge } from "@/components/StatusBadge";
+import { ScoreMeter } from "@/components/ScoreMeter";
 
 const VERDICTS = ["true", "false", "misleading", "unverified"];
 
@@ -62,7 +63,7 @@ export default function AdminClaimsPage() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-semibold mb-1">Claims log</h1>
+        <h1 className="font-display text-xl font-semibold mb-1">Claims log</h1>
         <p className="text-sm" style={{ color: "var(--muted)" }}>
           Every check the AI has run. Override a verdict if the AI got it wrong — this is the
           human safety net.
@@ -106,6 +107,12 @@ export default function AdminClaimsPage() {
                   </p>
                   <p className="text-sm">{c.text}</p>
                 </div>
+                {(c.evidenceConfidence != null || c.actionRisk != null) && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <ScoreMeter label="Evidence confidence" value={c.evidenceConfidence} color="var(--accent)" />
+                    <ScoreMeter label="Action risk" value={c.actionRisk} color="var(--danger)" />
+                  </div>
+                )}
                 <div>
                   <p className="label-tracked text-[10px] mb-1" style={{ color: "var(--muted)" }}>
                     AI explanation

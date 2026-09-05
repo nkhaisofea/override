@@ -4,6 +4,7 @@ import { getCollections } from "@/lib/mongodb";
 import { Logo } from "@/components/Logo";
 import { Card, PillButton } from "@/components/Card";
 import { VerdictBadge, RISK_CONFIG } from "@/components/StatusBadge";
+import { ScoreMeter } from "@/components/ScoreMeter";
 
 async function getClaim(id) {
   if (!ObjectId.isValid(id)) return null;
@@ -63,6 +64,23 @@ export default async function ResultPage({ params }) {
           </p>
         )}
       </Card>
+
+      {(claim.evidenceConfidence != null || claim.actionRisk != null) && (
+        <Card className="mb-4 flex flex-col gap-4">
+          <ScoreMeter
+            label="Evidence confidence"
+            value={claim.evidenceConfidence}
+            color="var(--accent)"
+            description="How strongly our trusted sources support this claim being true."
+          />
+          <ScoreMeter
+            label="Action risk"
+            value={claim.actionRisk}
+            color="var(--danger)"
+            description="How dangerous it would be to act on this claim if it's wrong."
+          />
+        </Card>
+      )}
 
       <p className="label-tracked text-xs mb-2" style={{ color: "var(--muted)" }}>
         Why

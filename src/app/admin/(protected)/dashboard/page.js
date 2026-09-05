@@ -27,28 +27,28 @@ export default function AdminDashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-semibold mb-4">Dashboard</h1>
+        <h1 className="font-display text-xl font-semibold mb-4">Dashboard</h1>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Card className="text-center">
-            <p className="text-2xl font-semibold">{stats.totalToday}</p>
+            <p className="font-display text-2xl font-semibold">{stats.totalToday}</p>
             <p className="label-tracked text-[10px] mt-1" style={{ color: "var(--muted)" }}>
               Checks today
             </p>
           </Card>
           <Card className="text-center">
-            <p className="text-2xl font-semibold">{stats.totalAllTime}</p>
+            <p className="font-display text-2xl font-semibold">{stats.totalAllTime}</p>
             <p className="label-tracked text-[10px] mt-1" style={{ color: "var(--muted)" }}>
               Checks all-time
             </p>
           </Card>
           <Card className="text-center">
-            <p className="text-2xl font-semibold">{stats.activeSourceCount}</p>
+            <p className="font-display text-2xl font-semibold">{stats.activeSourceCount}</p>
             <p className="label-tracked text-[10px] mt-1" style={{ color: "var(--muted)" }}>
               Trusted sources
             </p>
           </Card>
           <Card className="text-center">
-            <p className="text-2xl font-semibold" style={{ color: "var(--danger)" }}>
+            <p className="font-display text-2xl font-semibold" style={{ color: "var(--danger)" }}>
               {stats.verdictBreakdown.false + stats.verdictBreakdown.misleading}
             </p>
             <p className="label-tracked text-[10px] mt-1" style={{ color: "var(--muted)" }}>

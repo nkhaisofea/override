@@ -63,6 +63,8 @@ export async function maybeCreateAutoFaq({ newClaimDoc }) {
       // that needs no external social-media API.
       verdict: newClaimDoc.verdict,
       riskLevel: newClaimDoc.riskLevel || verdictToRiskLevel(newClaimDoc.verdict),
+      evidenceConfidence: newClaimDoc.evidenceConfidence ?? null,
+      actionRisk: newClaimDoc.actionRisk ?? null,
       clusterSize: distinctSessions.size,
       exampleText: newClaimDoc.text.slice(0, 300),
       sourceClaimIds: memberIds,

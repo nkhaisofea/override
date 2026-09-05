@@ -70,7 +70,7 @@ export default function AdminSourcesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-semibold mb-1">Trusted sources</h1>
+        <h1 className="font-display text-xl font-semibold mb-1">Trusted sources</h1>
         <p className="text-sm" style={{ color: "var(--muted)" }}>
           These are what the AI grounds its verdicts in. Add authoritative content (MOH, WHO,
           medical bodies) — the more coverage, the fewer &quot;unverified&quot; results.

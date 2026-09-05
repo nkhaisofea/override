@@ -44,7 +44,7 @@ function FaqPageInner() {
         <Logo className="mb-8" />
       </Link>
 
-      <h1 className="text-xl font-semibold mb-1">Health FAQs</h1>
+      <h1 className="font-display text-xl font-semibold mb-1">Health FAQs</h1>
       <p className="text-sm mb-5" style={{ color: "var(--muted)" }}>
         Claims verified so often we&apos;ve turned them into quick answers.
       </p>

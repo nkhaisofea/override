@@ -79,7 +79,7 @@ export default function AdminFaqPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-semibold mb-1">FAQ</h1>
+        <h1 className="font-display text-xl font-semibold mb-1">FAQ</h1>
         <p className="text-sm" style={{ color: "var(--muted)" }}>
           Manually written posts, plus auto-generated drafts from claims multiple sessions
           asked about recently — review those before they read as official.

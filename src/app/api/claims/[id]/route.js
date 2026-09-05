@@ -21,6 +21,8 @@ export async function GET(request, { params }) {
       claim: claim.claim,
       verdict: claim.verdict,
       riskLevel: claim.riskLevel,
+      evidenceConfidence: claim.evidenceConfidence ?? null,
+      actionRisk: claim.actionRisk ?? null,
       explanation: claim.explanation,
       sourceCitation: claim.sourceCitation,
       language: claim.language,
