@@ -1,35 +1,93 @@
+// Verdict and risk presentation.
+//
+// Class strings are written out in full rather than composed (`text-${color}`)
+// because Tailwind scans source statically — an interpolated class name is
+// never emitted into the stylesheet and silently renders unstyled.
+
 export const VERDICT_CONFIG = {
-  true: { label: "TRUE", color: "var(--accent)", soft: "var(--accent-soft)" },
-  false: { label: "FALSE", color: "var(--danger)", soft: "var(--danger-soft)" },
-  misleading: { label: "MISLEADING", color: "var(--caution)", soft: "var(--caution-soft)" },
-  unverified: { label: "UNVERIFIED", color: "var(--unverified)", soft: "var(--unverified-soft)" },
+  true: {
+    label: "TRUE",
+    text: "text-accent",
+    bg: "bg-accent-soft",
+    border: "border-accent",
+    dot: "bg-accent",
+  },
+  false: {
+    label: "FALSE",
+    text: "text-danger",
+    bg: "bg-danger-soft",
+    border: "border-danger",
+    dot: "bg-danger",
+  },
+  misleading: {
+    label: "MISLEADING",
+    text: "text-caution",
+    bg: "bg-caution-soft",
+    border: "border-caution",
+    dot: "bg-caution",
+  },
+  unverified: {
+    label: "UNVERIFIED",
+    text: "text-unverified",
+    bg: "bg-unverified-soft",
+    border: "border-unverified",
+    dot: "bg-unverified",
+  },
 };
 
 export const RISK_CONFIG = {
-  safe: { label: "SAFE", color: "var(--accent)", soft: "var(--accent-soft)" },
-  caution: { label: "CAUTION", color: "var(--caution)", soft: "var(--caution-soft)" },
-  high_risk: { label: "HIGH RISK", color: "var(--danger)", soft: "var(--danger-soft)" },
+  safe: {
+    label: "SAFE",
+    text: "text-accent",
+    bg: "bg-accent-soft",
+    border: "border-accent",
+    dot: "bg-accent",
+  },
+  caution: {
+    label: "CAUTION",
+    text: "text-caution",
+    bg: "bg-caution-soft",
+    border: "border-caution",
+    dot: "bg-caution",
+  },
+  high_risk: {
+    label: "HIGH RISK",
+    text: "text-danger",
+    bg: "bg-danger-soft",
+    border: "border-danger",
+    dot: "bg-danger",
+  },
 };
 
-export function VerdictBadge({ verdict, size = "md" }) {
+export function VerdictBadge({ verdict, size = "md", className = "" }) {
   const cfg = VERDICT_CONFIG[verdict] || VERDICT_CONFIG.unverified;
-  const pad = size === "lg" ? "px-5 py-2 text-sm" : "px-3 py-1 text-xs";
+  const pad = size === "lg" ? "px-5 py-2 text-sm" : "px-3 py-1 text-[11px]";
   return (
     <span
-      className={`label-tracked inline-flex items-center rounded-full ${pad}`}
-      style={{ color: cfg.color, background: cfg.soft, border: `1px solid ${cfg.color}` }}
+      className={`label-tracked inline-flex shrink-0 items-center rounded-full border ${pad} ${cfg.text} ${cfg.bg} ${cfg.border} ${className}`}
     >
       {cfg.label}
     </span>
   );
 }
 
-export function StatusDot({ riskLevel }) {
+export function RiskBadge({ riskLevel, size = "md", className = "" }) {
+  const cfg = RISK_CONFIG[riskLevel] || RISK_CONFIG.caution;
+  const pad = size === "lg" ? "px-5 py-2 text-sm" : "px-3 py-1 text-[11px]";
+  return (
+    <span
+      className={`label-tracked inline-flex shrink-0 items-center rounded-full border ${pad} ${cfg.text} ${cfg.bg} ${cfg.border} ${className}`}
+    >
+      {cfg.label}
+    </span>
+  );
+}
+
+export function StatusDot({ riskLevel, className = "" }) {
   const cfg = RISK_CONFIG[riskLevel] || RISK_CONFIG.caution;
   return (
     <span
-      className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
-      style={{ background: cfg.color }}
+      className={`inline-block size-2.5 shrink-0 rounded-full ${cfg.dot} ${className}`}
       aria-hidden="true"
     />
   );

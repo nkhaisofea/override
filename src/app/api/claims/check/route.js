@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { runCheckPipeline } from "@/lib/checkPipeline";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
+import { GeminiError } from "@/lib/gemini";
 
 const MAX_CLAIM_LENGTH = 2000;
 const SUPPORTED_LANGUAGES = ["ms", "en", "zh"];
@@ -41,6 +42,12 @@ export async function POST(request) {
     return NextResponse.json(response);
   } catch (err) {
     console.error("[/api/claims/check] error:", err);
+    // GeminiError carries a message written for the user (rate limited, not
+    // configured, timed out). Anything else stays generic — an internal error
+    // string is not something to put on a stranger's phone.
+    if (err instanceof GeminiError) {
+      return NextResponse.json({ error: err.userMessage }, { status: 502 });
+    }
     return NextResponse.json(
       { error: "Something went wrong while checking this claim. Please try again." },
       { status: 500 }

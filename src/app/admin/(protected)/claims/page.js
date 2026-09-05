@@ -1,29 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Card, PillButton } from "@/components/Card";
-import { VerdictBadge } from "@/components/StatusBadge";
+import { useCallback, useEffect, useState } from "react";
+import { Card, PillButton, SectionLabel } from "@/components/Card";
+import { VerdictBadge, RiskBadge } from "@/components/StatusBadge";
 import { ScoreMeter } from "@/components/ScoreMeter";
 
 const VERDICTS = ["true", "false", "misleading", "unverified"];
+const FILTERS = [
+  { key: "all", label: "All" },
+  { key: "overridden", label: "Overridden" },
+  { key: "unverified", label: "Unverified" },
+  { key: "high_risk", label: "High risk" },
+];
 
 export default function AdminClaimsPage() {
   const [claims, setClaims] = useState(null);
   const [error, setError] = useState("");
+  const [filter, setFilter] = useState("all");
   const [expandedId, setExpandedId] = useState(null);
   const [overrideVerdict, setOverrideVerdict] = useState("");
   const [overrideNote, setOverrideNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  function load() {
+  const load = useCallback(() => {
     fetch("/api/admin/claims?limit=100")
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then(setClaims)
       .catch(() => setError("Couldn't load claims."));
-  }
+  }, []);
 
-  useEffect(load, []);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   function toggleExpand(c) {
     if (expandedId === c.id) {
@@ -60,116 +69,165 @@ export default function AdminClaimsPage() {
     }
   }
 
+  const visible = (claims || []).filter((c) => {
+    if (filter === "overridden") return !!c.overriddenBy;
+    if (filter === "unverified") return c.verdict === "unverified";
+    if (filter === "high_risk") return c.riskLevel === "high_risk";
+    return true;
+  });
+
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="font-display text-xl font-semibold mb-1">Claims log</h1>
-        <p className="text-sm" style={{ color: "var(--muted)" }}>
+        <h1 className="font-display text-xl font-semibold sm:text-2xl">Claims log</h1>
+        <p className="mt-1 text-sm leading-relaxed text-muted">
           Every check the AI has run. Override a verdict if the AI got it wrong — this is the
           human safety net.
         </p>
       </div>
 
-      {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
-      {!claims && !error && <p style={{ color: "var(--muted)" }}>Loading…</p>}
-      {claims && claims.length === 0 && (
-        <p className="text-sm" style={{ color: "var(--muted)" }}>
-          No checks yet.
-        </p>
+      <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+        {FILTERS.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            onClick={() => setFilter(f.key)}
+            aria-pressed={filter === f.key}
+            className={`label-tracked shrink-0 rounded-full border px-3 py-1.5 text-[10px] transition-colors ${
+              filter === f.key
+                ? "border-accent bg-accent-soft text-accent"
+                : "border-border text-muted hover:border-border-strong hover:text-foreground"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {error && <p className="text-danger">{error}</p>}
+      {!claims && !error && <p className="text-muted">Loading…</p>}
+      {claims && visible.length === 0 && (
+        <Card className="text-center">
+          <p className="text-sm text-muted">
+            {claims.length === 0 ? "No checks yet." : "Nothing matches this filter."}
+          </p>
+        </Card>
       )}
 
       <div className="flex flex-col gap-2">
-        {claims?.map((c) => (
-          <Card key={c.id}>
-            <button className="w-full text-left" onClick={() => toggleExpand(c)}>
-              <div className="flex items-center gap-3">
-                <VerdictBadge verdict={c.verdict} />
-                {c.overriddenBy && (
-                  <span
-                    className="label-tracked text-[9px] rounded-full px-2 py-0.5"
-                    style={{ color: "var(--accent)", background: "var(--accent-soft)" }}
-                  >
-                    Overridden
-                  </span>
-                )}
-                <span className="flex-1 text-sm truncate">{c.claim || c.text}</span>
-                <span className="label-tracked text-[10px] shrink-0" style={{ color: "var(--muted)" }}>
-                  {new Date(c.createdAt).toLocaleDateString()}
-                </span>
-              </div>
-            </button>
-
-            {expandedId === c.id && (
-              <div className="mt-4 pt-4 border-t border-border flex flex-col gap-3">
-                <div>
-                  <p className="label-tracked text-[10px] mb-1" style={{ color: "var(--muted)" }}>
-                    Original message
-                  </p>
-                  <p className="text-sm">{c.text}</p>
-                </div>
-                {(c.evidenceConfidence != null || c.actionRisk != null) && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <ScoreMeter label="Evidence confidence" value={c.evidenceConfidence} color="var(--accent)" />
-                    <ScoreMeter label="Action risk" value={c.actionRisk} color="var(--danger)" />
-                  </div>
-                )}
-                <div>
-                  <p className="label-tracked text-[10px] mb-1" style={{ color: "var(--muted)" }}>
-                    AI explanation
-                  </p>
-                  <p className="text-sm" style={{ color: "var(--muted)" }}>
-                    {c.explanation}
-                  </p>
-                </div>
-                {c.sourceCitation && (
-                  <div>
-                    <p className="label-tracked text-[10px] mb-1" style={{ color: "var(--muted)" }}>
-                      Cited source
-                    </p>
-                    <p className="text-sm">{c.sourceCitation.title}</p>
-                  </div>
-                )}
-
-                <div>
-                  <p className="label-tracked text-[10px] mb-2" style={{ color: "var(--accent)" }}>
-                    Override verdict
-                  </p>
-                  <div className="flex gap-2 flex-wrap mb-3">
-                    {VERDICTS.map((v) => (
-                      <button
-                        key={v}
-                        onClick={() => setOverrideVerdict(v)}
-                        className="label-tracked text-[10px] rounded-full px-3 py-2 border transition"
-                        style={
-                          overrideVerdict === v
-                            ? { background: "var(--accent-soft)", borderColor: "var(--accent)", color: "var(--accent)" }
-                            : { background: "transparent", borderColor: "var(--border)", color: "var(--muted)" }
-                        }
-                      >
-                        {v}
-                      </button>
-                    ))}
-                  </div>
-                  <textarea
-                    rows={2}
-                    placeholder="Override note (optional) — why was this changed?"
-                    value={overrideNote}
-                    onChange={(e) => setOverrideNote(e.target.value)}
-                    className="w-full resize-none rounded-2xl border border-border bg-transparent p-3 text-sm outline-none placeholder:text-muted focus:border-accent mb-3"
-                  />
-                  {saveError && (
-                    <p className="text-xs mb-2" style={{ color: "var(--danger)" }}>
-                      {saveError}
-                    </p>
+        {visible.map((c) => {
+          const expanded = expandedId === c.id;
+          return (
+            <Card key={c.id}>
+              <button
+                className="w-full text-left"
+                onClick={() => toggleExpand(c)}
+                aria-expanded={expanded}
+              >
+                <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:gap-3">
+                  <VerdictBadge verdict={c.verdict} />
+                  {c.overriddenBy && (
+                    <span className="label-tracked shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[9px] text-accent">
+                      Overridden
+                    </span>
                   )}
-                  <PillButton onClick={() => handleOverride(c.id)} disabled={saving}>
-                    {saving ? "Saving…" : "Save override"}
-                  </PillButton>
+                  <span className="w-full min-w-0 flex-1 truncate text-sm sm:w-auto">
+                    {c.claim || c.text}
+                  </span>
+                  <span className="label-tracked shrink-0 text-[10px] text-muted">
+                    {new Date(c.createdAt).toLocaleDateString()}
+                  </span>
+                  <span className="shrink-0 text-muted" aria-hidden="true">
+                    {expanded ? "▾" : "›"}
+                  </span>
                 </div>
-              </div>
-            )}
-          </Card>
-        ))}
+              </button>
+
+              {expanded && (
+                <div className="mt-4 flex flex-col gap-4 border-t border-border pt-4">
+                  <div className="lg:grid lg:grid-cols-2 lg:gap-6">
+                    <div className="flex flex-col gap-4">
+                      <div>
+                        <SectionLabel className="mb-1">Original message</SectionLabel>
+                        <p className="text-sm leading-relaxed">{c.text}</p>
+                      </div>
+                      <div>
+                        <SectionLabel className="mb-1">AI explanation</SectionLabel>
+                        <p className="text-sm leading-relaxed text-muted">{c.explanation}</p>
+                      </div>
+                      {c.sourceCitation && (
+                        <div>
+                          <SectionLabel className="mb-1">Cited source</SectionLabel>
+                          <p className="text-sm">{c.sourceCitation.title}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-4 flex flex-col gap-4 lg:mt-0">
+                      {(c.evidenceConfidence != null || c.actionRisk != null) && (
+                        <div className="flex flex-col gap-3">
+                          <ScoreMeter
+                            label="Evidence confidence"
+                            value={c.evidenceConfidence}
+                            tone="accent"
+                          />
+                          <ScoreMeter label="Action risk" value={c.actionRisk} tone="danger" />
+                          <div className="flex items-center gap-2">
+                            <span className="label-tracked text-[10px] text-muted">
+                              Resulting risk
+                            </span>
+                            <RiskBadge riskLevel={c.riskLevel} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border pt-4">
+                    <SectionLabel tone="accent" className="mb-2">
+                      Override verdict
+                    </SectionLabel>
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {VERDICTS.map((v) => (
+                        <button
+                          key={v}
+                          onClick={() => setOverrideVerdict(v)}
+                          aria-pressed={overrideVerdict === v}
+                          className={`label-tracked rounded-full border px-3 py-2 text-[10px] transition-colors ${
+                            overrideVerdict === v
+                              ? "border-accent bg-accent-soft text-accent"
+                              : "border-border text-muted hover:border-border-strong hover:text-foreground"
+                          }`}
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      rows={2}
+                      placeholder="Override note (optional) — why was this changed?"
+                      value={overrideNote}
+                      onChange={(e) => setOverrideNote(e.target.value)}
+                      className="field mb-3 resize-y"
+                    />
+                    <p className="mb-3 text-[11px] leading-relaxed text-faint">
+                      The risk level is recalculated from the new verdict and this claim&apos;s
+                      existing action-risk score.
+                    </p>
+                    {saveError && (
+                      <p className="mb-2 text-xs text-danger" role="alert">
+                        {saveError}
+                      </p>
+                    )}
+                    <PillButton onClick={() => handleOverride(c.id)} disabled={saving}>
+                      {saving ? "Saving…" : "Save override"}
+                    </PillButton>
+                  </div>
+                </div>
+              )}
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

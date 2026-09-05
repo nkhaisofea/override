@@ -37,15 +37,13 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <main className="mx-auto max-w-sm px-5 pt-20 pb-16">
-      <div className="flex justify-center mb-8">
-        <Logo />
+    <main className="mx-auto w-full max-w-sm px-5 pt-20 pb-16">
+      <div className="mb-8 flex justify-center">
+        <Logo href="/" />
       </div>
       <Card raised>
-        <p className="label-tracked text-xs mb-1" style={{ color: "var(--accent)" }}>
-          Admin access
-        </p>
-        <p className="text-sm mb-5" style={{ color: "var(--muted)" }}>
+        <p className="label-tracked mb-1 text-xs text-accent">Admin access</p>
+        <p className="mb-5 text-sm text-muted">
           Sign in to manage sources, FAQs, and verdicts.
         </p>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -56,7 +54,7 @@ export default function AdminLoginPage() {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-2xl border border-border bg-transparent px-4 py-3 text-sm outline-none placeholder:text-muted focus:border-accent"
+            className="field"
           />
           <input
             type="password"
@@ -65,10 +63,10 @@ export default function AdminLoginPage() {
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-2xl border border-border bg-transparent px-4 py-3 text-sm outline-none placeholder:text-muted focus:border-accent"
+            className="field"
           />
           {error && (
-            <p className="text-xs" style={{ color: "var(--danger)" }}>
+            <p className="text-xs text-danger" role="alert">
               {error}
             </p>
           )}
@@ -77,7 +75,7 @@ export default function AdminLoginPage() {
           </PillButton>
         </form>
       </Card>
-      <p className="text-center text-xs mt-6" style={{ color: "var(--muted)" }}>
+      <p className="mt-6 text-center text-xs text-muted">
         Admin accounts are pre-provisioned — there is no public sign-up.
       </p>
     </main>

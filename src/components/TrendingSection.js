@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card } from "@/components/Card";
+import { InteractiveCard, SectionLabel } from "@/components/Card";
 import { VerdictBadge } from "@/components/StatusBadge";
 
 // "Trending right now" — surfaces claims that either (a) enough distinct
@@ -15,65 +15,67 @@ export default function TrendingSection() {
   const [items, setItems] = useState(null);
 
   useEffect(() => {
-    let cancelled = false;
-    fetch("/api/trending")
+    const controller = new AbortController();
+    fetch("/api/trending", { signal: controller.signal })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then((data) => {
-        if (!cancelled) setItems(Array.isArray(data) ? data : []);
-      })
+      .then((data) => setItems(Array.isArray(data) ? data : []))
       .catch(() => {
-        if (!cancelled) setItems([]);
+        // Aborted on unmount, or the feed is unavailable — either way the
+        // section just stays hidden. Nothing here is worth an error state.
+        if (!controller.signal.aborted) setItems([]);
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, []);
 
   // Nothing to show yet (no auto-clusters, nothing featured) — stay silent
-  // rather than showing an awkward empty state on the homepage.
+  // rather than showing an awkward empty state.
   if (!items || items.length === 0) return null;
 
   return (
-    <div className="mb-6">
-      <div className="flex items-center gap-2 mb-2">
-        <span
-          className="inline-block w-1.5 h-1.5 rounded-full animate-pulse"
-          style={{ background: "var(--danger)" }}
-        />
-        <p className="label-tracked text-xs" style={{ color: "var(--muted)" }}>
-          Trending right now
-        </p>
+    <section className="mb-8">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="inline-block size-1.5 animate-pulse rounded-full bg-danger" aria-hidden="true" />
+        <SectionLabel>Trending right now</SectionLabel>
       </div>
-      <div className="flex gap-3 overflow-x-auto pb-2 -mx-5 px-5 snap-x snap-mandatory">
+
+      {/* Mobile: a horizontal snap rail that bleeds to the screen edges.
+          Laptop: a plain stack in the sidebar, where there's vertical room and
+          a sideways scroller would be the wrong affordance. */}
+      <div className="no-scrollbar -mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 sm:-mx-8 sm:px-8 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0">
         {items.map((item) => (
-          <button
+          <InteractiveCard
             key={item.id}
-            onClick={() => router.push(`/faq?q=${encodeURIComponent(item.title)}`)}
-            className="text-left shrink-0 w-[240px] snap-start"
+            as="button"
+            type="button"
+            raised
+            onClick={() =>
+              router.push(
+                item.topicTag
+                  ? `/faq?tag=${encodeURIComponent(item.topicTag)}`
+                  : `/faq?q=${encodeURIComponent(item.title)}`
+              )
+            }
+            className="w-60 shrink-0 snap-start lg:w-full lg:shrink"
           >
-            <Card raised className="h-full">
-              <div className="flex items-center justify-between mb-2 gap-2">
-                {item.verdict ? (
-                  <VerdictBadge verdict={item.verdict} />
-                ) : (
-                  <span className="label-tracked text-[9px]" style={{ color: "var(--muted)" }}>
-                    Unverified
-                  </span>
-                )}
-                {item.clusterSize && (
-                  <span className="label-tracked text-[9px] shrink-0" style={{ color: "var(--muted)" }}>
-                    {item.clusterSize} asked
-                  </span>
-                )}
-              </div>
-              <p className="text-sm font-medium leading-snug line-clamp-2 mb-1">{item.title}</p>
-              <p className="text-xs leading-relaxed line-clamp-3" style={{ color: "var(--muted)" }}>
-                {item.exampleText || item.body}
-              </p>
-            </Card>
-          </button>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              {item.verdict ? (
+                <VerdictBadge verdict={item.verdict} />
+              ) : (
+                <span className="label-tracked text-[9px] text-muted">Unverified</span>
+              )}
+              {item.clusterSize > 0 && (
+                <span className="label-tracked shrink-0 text-[9px] text-muted">
+                  {item.clusterSize} asked
+                </span>
+              )}
+            </div>
+            <p className="mb-1 line-clamp-2 text-sm font-medium leading-snug">{item.title}</p>
+            <p className="line-clamp-3 text-xs leading-relaxed text-muted">
+              {item.exampleText || item.body}
+            </p>
+          </InteractiveCard>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

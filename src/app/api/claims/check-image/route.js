@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { extractClaimFromImage } from "@/lib/gemini";
+import { extractClaimFromImage, GeminiError } from "@/lib/gemini";
 import { runCheckPipeline } from "@/lib/checkPipeline";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 
@@ -59,6 +59,9 @@ export async function POST(request) {
     return NextResponse.json(response);
   } catch (err) {
     console.error("[/api/claims/check-image] error:", err);
+    if (err instanceof GeminiError) {
+      return NextResponse.json({ error: err.userMessage }, { status: 502 });
+    }
     return NextResponse.json(
       { error: "Something went wrong while reading this screenshot. Please try again." },
       { status: 500 }

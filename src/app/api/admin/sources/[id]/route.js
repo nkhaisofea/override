@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getCollections } from "@/lib/mongodb";
 import { requireAdmin } from "@/lib/requireAdmin";
-import { embedText } from "@/lib/gemini";
+import { embedDocument, GeminiError } from "@/lib/gemini";
+import { normalizeTags } from "@/lib/tags";
 
 export async function PUT(request, { params }) {
   const { admin, response } = requireAdmin(request);
@@ -23,19 +24,42 @@ export async function PUT(request, { params }) {
   const title = typeof body.title === "string" ? body.title.trim() : "";
   const text = typeof body.text === "string" ? body.text.trim() : "";
   const url = typeof body.url === "string" ? body.url.trim() : "";
+  const topicTags = normalizeTags(body.topicTags);
 
   if (!title || !text) {
     return NextResponse.json({ error: "title and text are required" }, { status: 400 });
   }
 
   try {
-    // Re-embed on edit, since the content used for retrieval has changed.
-    const embedding = await embedText(`${title}\n\n${text}`);
-
     const { sources } = await getCollections();
+
+    // Only re-embed when the embedded content actually changed. Editing a URL
+    // or retagging shouldn't spend a Gemini call (or risk failing the save on
+    // a rate limit).
+    const existing = await sources.findOne(
+      { _id: new ObjectId(id) },
+      { projection: { title: 1, text: 1 } }
+    );
+    if (!existing) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    const contentChanged = existing.title !== title || existing.text !== text;
+    const update = {
+      title,
+      text,
+      url: url || null,
+      topicTags,
+      updatedAt: new Date(),
+      updatedBy: admin.email,
+    };
+    if (contentChanged) {
+      update.embedding = await embedDocument(`${title}\n\n${text}`);
+    }
+
     const result = await sources.findOneAndUpdate(
       { _id: new ObjectId(id) },
-      { $set: { title, text, url: url || null, embedding, updatedAt: new Date(), updatedBy: admin.email } },
+      { $set: update },
       { returnDocument: "after" }
     );
 
@@ -49,13 +73,15 @@ export async function PUT(request, { params }) {
       title: updated.title,
       text: updated.text,
       url: updated.url,
+      topicTags: updated.topicTags || [],
+      reembedded: contentChanged,
     });
   } catch (err) {
     console.error("[/api/admin/sources/[id] PUT] error:", err);
-    return NextResponse.json(
-      { error: err.message || "Something went wrong." },
-      { status: 500 }
-    );
+    if (err instanceof GeminiError) {
+      return NextResponse.json({ error: err.userMessage }, { status: 502 });
+    }
+    return NextResponse.json({ error: "Something went wrong." }, { status: 500 });
   }
 }
 

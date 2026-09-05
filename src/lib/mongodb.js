@@ -1,4 +1,5 @@
 import { MongoClient } from "mongodb";
+import { ensureIndexes } from "./indexes";
 
 const uri = process.env.MONGODB_URI;
 const dbName = process.env.MONGODB_DB || "vitaura";
@@ -35,8 +36,43 @@ export async function getDb() {
   return client.db(dbName);
 }
 
+/**
+ * Builds indexes once per process, the first time the database is touched.
+ *
+ * Memoised on `global` for the same reason the client is: in dev this survives
+ * hot reloads, and in a warm serverless instance it means one createIndex pass
+ * rather than one per request. Kept as a promise (not a boolean) so concurrent
+ * first requests await the same run instead of racing to build the same
+ * indexes.
+ *
+ * Deliberately non-fatal: a unique index that can't be built because existing
+ * data violates it is worth a loud warning, but must not take down the app.
+ * The one that matters for correctness — faq_posts.clusterKey — only ever
+ * fails if there are already duplicate auto-FAQ posts, which the seed and
+ * upsert paths avoid creating.
+ */
+function getIndexPromise(db) {
+  if (!global._vitauraIndexPromise) {
+    global._vitauraIndexPromise = ensureIndexes(db)
+      .then(({ created, failed }) => {
+        if (failed.length) {
+          console.warn(
+            `[mongodb] ${failed.length} index(es) could not be built:`,
+            failed.map((f) => `${f.index}: ${f.error}`).join("; ")
+          );
+        }
+        console.log(`[mongodb] ${created.length} index(es) ensured.`);
+      })
+      .catch((err) => {
+        console.warn("[mongodb] index setup failed:", err.message);
+      });
+  }
+  return global._vitauraIndexPromise;
+}
+
 export async function getCollections() {
   const db = await getDb();
+  await getIndexPromise(db);
   return {
     claims: db.collection("claims"),
     sources: db.collection("sources"),

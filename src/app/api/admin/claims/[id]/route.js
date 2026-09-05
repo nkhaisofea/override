@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getCollections } from "@/lib/mongodb";
 import { requireAdmin } from "@/lib/requireAdmin";
-import { verdictToRiskLevel } from "@/lib/gemini";
+import { deriveRiskLevel } from "@/lib/risk";
 
 const VALID_VERDICTS = ["true", "false", "misleading", "unverified"];
 
@@ -24,7 +24,8 @@ export async function PATCH(request, { params }) {
   }
 
   const verdict = body.verdict;
-  const overrideNote = typeof body.overrideNote === "string" ? body.overrideNote.trim().slice(0, 1000) : "";
+  const overrideNote =
+    typeof body.overrideNote === "string" ? body.overrideNote.trim().slice(0, 1000) : "";
 
   if (!VALID_VERDICTS.includes(verdict)) {
     return NextResponse.json(
@@ -35,7 +36,20 @@ export async function PATCH(request, { params }) {
 
   try {
     const { claims } = await getCollections();
-    const riskLevel = verdictToRiskLevel(verdict);
+
+    // Read first, so the corrected verdict is re-blended with the action-risk
+    // score from the original check. Deriving risk from the verdict alone here
+    // would quietly discard that signal on exactly the claims a human cared
+    // enough to review.
+    const existing = await claims.findOne(
+      { _id: new ObjectId(id) },
+      { projection: { actionRisk: 1 } }
+    );
+    if (!existing) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    const riskLevel = deriveRiskLevel(verdict, existing.actionRisk);
 
     const result = await claims.findOneAndUpdate(
       { _id: new ObjectId(id) },
