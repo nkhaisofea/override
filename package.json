@@ -6,10 +6,14 @@
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:admin": "node scripts/seed-admin.mjs"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
+    "bcryptjs": "^3.0.3",
+    "jsonwebtoken": "^9.0.3",
+    "mongodb": "^7.6.0",
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8"
