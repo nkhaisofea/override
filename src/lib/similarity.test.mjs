@@ -14,7 +14,9 @@ import {
   reorderByRank,
   countDimensionMismatches,
   findClusterMembers,
+  evaluateAutoFaqTrigger,
   AUTO_FAQ_SIMILARITY_THRESHOLD,
+  AUTO_FAQ_SHARE_THRESHOLD,
 } from "./similarity.js";
 
 test("cosine similarity basics", () => {
@@ -130,4 +132,65 @@ test("findClusterMembers groups only claims above the similarity threshold", () 
   ];
   const members = findClusterMembers([1, 0], recent);
   assert.deepEqual(members.map((m) => m._id), [1]);
+});
+
+// --- Auto-FAQ trigger -------------------------------------------------------
+// The rule as specified: publish when a topic is >=50% of everyone who used the
+// app in the window, AND at least 5 distinct people asked. The share is the
+// signal; the floor is what stops a sample of one from publishing a public
+// health FAQ.
+
+test("the worked example from the spec: 5 of 10 publishes", () => {
+  const t = evaluateAutoFaqTrigger(5, 10);
+  assert.equal(t.publish, true);
+  assert.equal(t.share, 0.5);
+  assert.match(t.reason, /5 of 10/);
+});
+
+test("share alone cannot publish — the floor blocks small samples", () => {
+  // 100% share, but only two people have used the app at all.
+  const t = evaluateAutoFaqTrigger(2, 2);
+  assert.equal(t.publish, false);
+  assert.equal(t.share, 1);
+  assert.match(t.reason, /need 5/);
+
+  // The pathological case: the very first user is 100% of all users.
+  assert.equal(evaluateAutoFaqTrigger(1, 1).publish, false);
+});
+
+test("headcount alone cannot publish — it must also be a majority", () => {
+  // 6 people asked about it, but 30 people asked about other things.
+  const t = evaluateAutoFaqTrigger(6, 30);
+  assert.equal(t.publish, false);
+  assert.equal(t.share, 0.2);
+  assert.match(t.reason, /20%/);
+});
+
+test("exactly at both thresholds publishes (boundaries are inclusive)", () => {
+  assert.equal(evaluateAutoFaqTrigger(5, 10).publish, true); // exactly 50%, exactly 5
+});
+
+test("just under either threshold does not publish", () => {
+  assert.equal(evaluateAutoFaqTrigger(4, 8).publish, false); // 50% but only 4 people
+  assert.equal(evaluateAutoFaqTrigger(5, 11).publish, false); // 5 people but 45.5%
+});
+
+test("share threshold is a sane fraction, not a percentage", () => {
+  // Guards against someone setting AUTO_FAQ_SHARE_THRESHOLD=50 meaning "50%",
+  // which would make the rule impossible to satisfy.
+  assert.ok(AUTO_FAQ_SHARE_THRESHOLD > 0 && AUTO_FAQ_SHARE_THRESHOLD <= 1);
+});
+
+test("a zero denominator cannot divide by zero or publish", () => {
+  const t = evaluateAutoFaqTrigger(0, 0);
+  assert.equal(t.share, 0);
+  assert.equal(t.publish, false);
+  assert.ok(Number.isFinite(t.share));
+});
+
+test("every outcome carries a human-readable reason", () => {
+  for (const [c, n] of [[5, 10], [2, 2], [6, 30], [0, 0], [1, 1]]) {
+    const t = evaluateAutoFaqTrigger(c, n);
+    assert.ok(t.reason && t.reason.length > 5, `no reason for ${c}/${n}`);
+  }
 });

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCollections } from "@/lib/mongodb";
+import { getCollections, DatabaseUnavailableError } from "@/lib/mongodb";
 
 // Public, unauthenticated — powers the homepage "Trending right now" feed.
 //
@@ -43,6 +43,13 @@ export async function GET(request) {
       }))
     );
   } catch (err) {
+    // The trending rail is decorative — the homepage works fine without it.
+    // Returning an empty feed rather than a 500 keeps a database outage from
+    // filling the user's console with errors on a page that still functions.
+    if (err instanceof DatabaseUnavailableError) {
+      console.warn("[/api/trending] database unavailable, serving empty feed:", err.hint);
+      return NextResponse.json([]);
+    }
     console.error("[/api/trending] error:", err);
     return NextResponse.json({ error: "Something went wrong." }, { status: 500 });
   }

@@ -131,6 +131,20 @@ instructed never to guess from general knowledge — so until they're embedded, 
 correctly but uselessly returns "unverified"**. The admin dashboard and sources page both warn
 loudly when this is the case.
 
+### Admin login (demo account)
+
+The account already seeded on the demo database:
+
+| | |
+| --- | --- |
+| **URL** | `/admin/login` |
+| **Email** | `admin@vitaura.app` |
+| **Password** | `VitauraDemo2026!` |
+
+This is a throwaway demo credential for judging, published here deliberately so anyone
+reviewing the project can open the admin side. It is not a production account. Rotate it with
+`npm run seed:admin -- <email> <password>` before pointing this at anything real.
+
 ### Environment variables
 
 See `.env.local.example` for the full annotated list. Required: `MONGODB_URI`,
@@ -144,17 +158,39 @@ Two worth knowing about:
   "Re-embed all".
 - **`AUTO_FAQ_USER_THRESHOLD`** (default `5`) — see below.
 
+### Auto-FAQ: how it decides
+
+Vitaura publishes a public FAQ entry automatically when one topic **dominates** what people
+are asking — "5 of the 10 people who checked anything today asked about dengue". Two
+conditions, both required:
+
+| | Default | Env var |
+| --- | --- | --- |
+| **Share** — the topic's fraction of distinct people in the window | `>= 50%` | `AUTO_FAQ_SHARE_THRESHOLD` |
+| **Floor** — how many distinct people asked | `>= 5` | `AUTO_FAQ_USER_THRESHOLD` |
+| **Window** | 24h | `AUTO_FAQ_WINDOW_HOURS` |
+
+The floor is not redundant. Share alone is meaningless at low traffic: the first person to
+use the app is 100% of its users, so without a floor their single question would publish a
+public health FAQ off a sample of one. Conversely the share is what makes this about
+*trending* rather than volume — 6 people out of 30 is a bigger number but a smaller story.
+
+Both figures are stored on the post (`clusterSize`, `clusterTotalSessions`, `clusterShare`)
+and shown in `/admin/faq` as "5 of 10 asked · 50%", so an admin can see why something
+published. Logic and tests: [`src/lib/similarity.js`](src/lib/similarity.js),
+[`src/lib/similarity.test.mjs`](src/lib/similarity.test.mjs).
+
 ### Demoing the auto-FAQ live
 
-Auto-FAQ publishes an entry when N *distinct* sessions ask about the same topic within a
-rolling window. You will not have five strangers in the room, so for a live demo:
+You will not have ten strangers in the room, so for a live demo:
 
 ```bash
 AUTO_FAQ_USER_THRESHOLD=2
 ```
 
 Then paste the same claim from two different browsers (each gets its own localStorage session
-id) and watch the entry appear on `/faq` and in the homepage trending feed, tagged **Auto**.
+id). With 2 of 2 you're at 100% share and 2 people, so it fires — watch the entry appear on
+`/faq` and in the homepage trending feed, tagged **Auto**.
 
 Alternatively, `/admin/faq` has a **"Feature as trending"** checkbox to spotlight a post
 manually — useful as a fallback if the live trigger doesn't fire on stage.
@@ -234,6 +270,23 @@ from before that existed, clear it by hand once:
 
 A good tell that you're on a stale worker: the chunk hash in the console error doesn't match
 the one in the page source.
+
+### Everything returns 500 / "Something went wrong"
+
+Hit **`/api/health`** first. It reports the database and Gemini separately, each with a hint:
+
+```bash
+curl -s localhost:3000/api/health | python -m json.tool
+```
+
+`503` means a dependency is down; the `hint` field says which and what to do. The two that
+actually happen:
+
+- **`tlsv1 alert internal error` from Atlas** — the cluster is paused or deleted (Atlas →
+  Database → Resume), or your IP isn't on the Network Access allow list. Note this is a
+  *server-side* rejection: if plain TLS to other hosts works, it's not your network.
+- **`429 ... PerDay` from Gemini** — the model's daily free-tier cap, not a burst limit.
+  Waiting will not help; change `GEMINI_MODEL` (see `.env.local.example`).
 
 ### Every check comes back "unverified"
 

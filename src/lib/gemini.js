@@ -468,3 +468,49 @@ Cited trusted source: ${sourceTitle || "(none)"}`,
       .slice(0, 30) || "general",
   };
 }
+
+/**
+ * Connectivity + quota probe for /api/health. Never throws — it reports.
+ *
+ * Uses embedContent rather than generateContent deliberately: it's the cheaper
+ * call, and on the free tier it has a far larger daily allowance, so a health
+ * check can't itself consume the scarce generation quota it exists to monitor.
+ */
+export async function checkGeminiHealth() {
+  if (!API_KEY) {
+    return {
+      ok: false,
+      error: "GEMINI_API_KEY is not set",
+      hint: "Add it to .env.local — get one at https://aistudio.google.com/app/apikey",
+    };
+  }
+  try {
+    const started = Date.now();
+    const values = await embedQuery("health check");
+    return {
+      ok: true,
+      model: GENERATION_MODEL,
+      embeddingModel: EMBEDDING_MODEL,
+      embeddingDimension: values.length,
+      latencyMs: Date.now() - started,
+    };
+  } catch (err) {
+    const message = err?.message || String(err);
+    let hint = "Check GEMINI_API_KEY and the configured model names.";
+
+    if (err?.status === 429) {
+      hint = /PerDay/i.test(message)
+        ? `Daily free-tier quota exhausted for ${GENERATION_MODEL}. Waiting will not help — ` +
+          "switch GEMINI_MODEL (gemini-2.5-flash-lite has a much higher free cap)."
+        : "Rate limited. This is a short burst limit; retry shortly.";
+    } else if (err?.status === 404) {
+      hint =
+        `Model not found — "${GENERATION_MODEL}" or "${EMBEDDING_MODEL}" may be retired. ` +
+        "Check https://ai.google.dev/gemini-api/docs/models and update GEMINI_MODEL.";
+    } else if (err?.status === 400 || err?.status === 403) {
+      hint = "The API key was rejected. Check GEMINI_API_KEY is correct and enabled.";
+    }
+
+    return { ok: false, status: err?.status ?? null, error: message.slice(0, 200), hint };
+  }
+}

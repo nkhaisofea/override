@@ -29,16 +29,21 @@ export default function AdminProtectedLayout({ children }) {
       })
       .catch(() => {
         if (cancelled) return;
-        router.replace("/admin/login");
+        // Carry where they were trying to go, so signing in again lands them
+        // back there instead of always dumping them on the dashboard.
+        const next = encodeURIComponent(pathname || "/admin/dashboard");
+        router.replace(`/admin/login?expired=1&next=${next}`);
       });
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, pathname]);
 
   async function handleLogout() {
     await fetch("/api/admin/logout", { method: "POST" });
-    router.push("/admin/login");
+    // replace so the back button can't return to a dashboard the session no
+    // longer authorises.
+    router.replace("/admin/login");
   }
 
   // This is a convenience gate, not the security boundary — every /api/admin

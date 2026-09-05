@@ -67,8 +67,52 @@ export const AUTO_FAQ_SIMILARITY_THRESHOLD = envNumber(
   "AUTO_FAQ_SIMILARITY_THRESHOLD",
   0.86
 );
+// Auto-FAQ fires on TWO conditions, both of which must hold.
+//
+// 1. Share: the topic accounts for at least this fraction of everyone who used
+//    the app in the window — "5 of the 10 people who asked anything today
+//    asked about dengue". This is the real signal that something is going
+//    around, and it's what makes the feature about *trending*, not volume.
+export const AUTO_FAQ_SHARE_THRESHOLD = envNumber("AUTO_FAQ_SHARE_THRESHOLD", 0.5);
+
+// 2. Floor: at least this many distinct people. Share alone is unusable at low
+//    traffic — the first person to ever use the app is 100% of it, and every
+//    single early question would auto-publish a public health FAQ off a sample
+//    of one. The floor is what stops that.
 export const AUTO_FAQ_USER_COUNT_THRESHOLD = envNumber("AUTO_FAQ_USER_THRESHOLD", 5);
+
 export const AUTO_FAQ_WINDOW_HOURS = envNumber("AUTO_FAQ_WINDOW_HOURS", 24);
+
+/**
+ * Decide whether a topic cluster has crossed the auto-publish bar.
+ *
+ * @param {number} clusterSessions - distinct people who asked about this topic
+ * @param {number} totalSessions - distinct people who asked about anything, same window
+ * @returns {{publish: boolean, share: number, reason: string}}
+ */
+export function evaluateAutoFaqTrigger(clusterSessions, totalSessions) {
+  const share = totalSessions > 0 ? clusterSessions / totalSessions : 0;
+
+  if (clusterSessions < AUTO_FAQ_USER_COUNT_THRESHOLD) {
+    return {
+      publish: false,
+      share,
+      reason: `only ${clusterSessions} distinct session(s), need ${AUTO_FAQ_USER_COUNT_THRESHOLD}`,
+    };
+  }
+  if (share < AUTO_FAQ_SHARE_THRESHOLD) {
+    return {
+      publish: false,
+      share,
+      reason: `${(share * 100).toFixed(0)}% of recent users, need ${(AUTO_FAQ_SHARE_THRESHOLD * 100).toFixed(0)}%`,
+    };
+  }
+  return {
+    publish: true,
+    share,
+    reason: `${clusterSessions} of ${totalSessions} distinct users (${(share * 100).toFixed(0)}%)`,
+  };
+}
 
 // Given a new claim's embedding and the recent claims (already fetched from
 // the rolling window), find which prior claims belong to the "same topic"

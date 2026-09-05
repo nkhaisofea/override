@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { extractClaimFromImage, GeminiError } from "@/lib/gemini";
+import { DatabaseUnavailableError } from "@/lib/mongodb";
 import { runCheckPipeline } from "@/lib/checkPipeline";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 
@@ -59,6 +60,21 @@ export async function POST(request) {
     return NextResponse.json(response);
   } catch (err) {
     console.error("[/api/claims/check-image] error:", err);
+    // A dead database is a setup problem, not a bad claim. Say so — in
+    // development include the actionable hint, since a generic message here
+    // is exactly what makes "why is it 500ing?" take an hour. Production
+    // stays vague: setup hints are not for strangers.
+    if (err instanceof DatabaseUnavailableError) {
+      return NextResponse.json(
+        {
+          error:
+            process.env.NODE_ENV === "production"
+              ? "Vitaura is temporarily unavailable. Please try again shortly."
+              : `Database unavailable. ${err.hint} (See /api/health.)`,
+        },
+        { status: 503 }
+      );
+    }
     if (err instanceof GeminiError) {
       return NextResponse.json({ error: err.userMessage }, { status: 502 });
     }

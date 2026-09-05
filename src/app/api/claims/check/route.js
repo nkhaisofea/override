@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { runCheckPipeline } from "@/lib/checkPipeline";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { GeminiError } from "@/lib/gemini";
+import { DatabaseUnavailableError } from "@/lib/mongodb";
 
 const MAX_CLAIM_LENGTH = 2000;
 const SUPPORTED_LANGUAGES = ["ms", "en", "zh"];
@@ -45,6 +46,21 @@ export async function POST(request) {
     // GeminiError carries a message written for the user (rate limited, not
     // configured, timed out). Anything else stays generic — an internal error
     // string is not something to put on a stranger's phone.
+    // A dead database is a setup problem, not a bad claim. Say so — in
+    // development include the actionable hint, since a generic message here
+    // is exactly what makes "why is it 500ing?" take an hour. Production
+    // stays vague: setup hints are not for strangers.
+    if (err instanceof DatabaseUnavailableError) {
+      return NextResponse.json(
+        {
+          error:
+            process.env.NODE_ENV === "production"
+              ? "Vitaura is temporarily unavailable. Please try again shortly."
+              : `Database unavailable. ${err.hint} (See /api/health.)`,
+        },
+        { status: 503 }
+      );
+    }
     if (err instanceof GeminiError) {
       return NextResponse.json({ error: err.userMessage }, { status: 502 });
     }

@@ -29,6 +29,8 @@ export async function GET(request) {
         verdict: p.verdict || null,
         riskLevel: p.riskLevel || null,
         clusterSize: p.clusterSize || null,
+        clusterTotalSessions: p.clusterTotalSessions || null,
+        clusterShare: typeof p.clusterShare === "number" ? p.clusterShare : null,
         createdAt: p.createdAt,
       }))
     );

@@ -13,26 +13,81 @@ if (!uri) {
   );
 }
 
-let clientPromise;
-
-// Reuse the client (and its connection pool) across hot reloads in dev,
-// and across serverless invocations in the same warm instance in prod.
-if (!global._vitauraMongoClientPromise) {
-  const client = new MongoClient(uri || "mongodb://invalid-not-configured", {
-    maxPoolSize: 10,
-    minPoolSize: 1,
-  });
-  global._vitauraMongoClientPromise = client.connect();
+/** Thrown when the database is unreachable, as opposed to a query failing. */
+export class DatabaseUnavailableError extends Error {
+  constructor(message, { cause, hint } = {}) {
+    super(message);
+    this.name = "DatabaseUnavailableError";
+    this.cause = cause;
+    this.hint = hint;
+  }
 }
-clientPromise = global._vitauraMongoClientPromise;
+
+// Turns MongoDB's driver errors into something a human can act on. These two
+// failures look nothing alike in the logs but are the only ones that actually
+// happen during setup, and neither error message says what to do about it.
+function explainConnectionError(err) {
+  const msg = String(err?.message || err);
+
+  if (/tlsv1 alert internal error|SSL alert number 80/i.test(msg)) {
+    return (
+      "Atlas rejected the TLS handshake. The cluster is most likely PAUSED or deleted " +
+      "(Atlas → Database → Resume), or your IP is not on the Network Access allow list."
+    );
+  }
+  if (/ENOTFOUND|querySrv|EAI_AGAIN/i.test(msg)) {
+    return "The cluster hostname didn't resolve. Check MONGODB_URI for typos, or check DNS.";
+  }
+  if (/Authentication failed|bad auth/i.test(msg)) {
+    return "The username or password in MONGODB_URI is wrong. Note that a password with @ : / ? # must be percent-encoded.";
+  }
+  if (/timed out|ETIMEDOUT|serverSelectionTimeout/i.test(msg)) {
+    return "Couldn't reach the cluster in time — usually the Network Access allow list, or a firewall blocking port 27017.";
+  }
+  return "Check MONGODB_URI, and that the Atlas cluster is running and allows your IP.";
+}
+
+/**
+ * Connect, caching the client across hot reloads and warm serverless
+ * invocations so the pool is reused.
+ *
+ * The important detail is the `.catch` that clears the cached promise. A
+ * rejected promise stored on `global` is permanent: `global` survives Fast
+ * Refresh, so caching a failed connect meant that once the database was
+ * unreachable at startup, every later request reused that same rejection —
+ * and fixing Atlas appeared to change nothing until the dev server was fully
+ * restarted. Clearing it makes the next request genuinely retry.
+ */
+function getClientPromise() {
+  if (!global._vitauraMongoClientPromise) {
+    const client = new MongoClient(uri, {
+      maxPoolSize: 10,
+      minPoolSize: 1,
+      // Fail fast rather than hanging a request for 30s while the driver
+      // keeps hunting for a reachable node.
+      serverSelectionTimeoutMS: 10_000,
+    });
+
+    global._vitauraMongoClientPromise = client.connect().catch((err) => {
+      global._vitauraMongoClientPromise = null; // let the next call retry
+      console.error(`[mongodb] connection failed: ${err.message}`);
+      console.error(`[mongodb] ${explainConnectionError(err)}`);
+      throw new DatabaseUnavailableError("Could not connect to MongoDB", {
+        cause: err,
+        hint: explainConnectionError(err),
+      });
+    });
+  }
+  return global._vitauraMongoClientPromise;
+}
 
 export async function getDb() {
   if (!uri) {
-    throw new Error(
-      "MONGODB_URI is not configured. Add it to .env.local (see README)."
-    );
+    throw new DatabaseUnavailableError("MONGODB_URI is not configured", {
+      hint: "Add MONGODB_URI to .env.local (see .env.local.example).",
+    });
   }
-  const client = await clientPromise;
+  const client = await getClientPromise();
   return client.db(dbName);
 }
 
@@ -64,6 +119,8 @@ function getIndexPromise(db) {
         console.log(`[mongodb] ${created.length} index(es) ensured.`);
       })
       .catch((err) => {
+        // Same reasoning as the client promise: don't cache a rejection.
+        global._vitauraIndexPromise = null;
         console.warn("[mongodb] index setup failed:", err.message);
       });
   }
@@ -79,4 +136,25 @@ export async function getCollections() {
     faqPosts: db.collection("faq_posts"),
     admins: db.collection("admins"),
   };
+}
+
+/**
+ * Connectivity probe for /api/health. Never throws — it reports.
+ */
+export async function checkDatabaseHealth() {
+  if (!uri) {
+    return { ok: false, error: "MONGODB_URI is not set", hint: "Add it to .env.local." };
+  }
+  try {
+    const db = await getDb();
+    const started = Date.now();
+    await db.command({ ping: 1 });
+    return { ok: true, database: dbName, latencyMs: Date.now() - started };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err?.cause?.message || err.message,
+      hint: err.hint || explainConnectionError(err),
+    };
+  }
 }

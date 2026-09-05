@@ -65,8 +65,19 @@ export async function runCheckPipeline({ text, language, sessionId, inputType = 
   //    score — see lib/risk.js for why verdict alone is the wrong signal.
   const riskLevel = deriveRiskLevel(result.verdict, result.actionRisk);
 
+  // Which source to show under the verdict.
+  //
+  // If the model named one, use it. If it named none, fall back to the best
+  // retrieved match — EXCEPT when the verdict is "unverified", which means the
+  // model looked at the retrieved text and concluded it doesn't cover this
+  // claim. Attaching a citation there actively misleads: retrieval casts a
+  // wide net, so an unrelated source can clear the similarity floor, and the
+  // result page would show "Source: WHO — Detox diets and cleanses" beneath a
+  // question about protein shakes. A fact-checker citing a source that doesn't
+  // support anything is worse than showing no source at all.
+  const citedByModel = matched.find((m) => m.title === result.citedSourceTitle);
   const topSource =
-    matched.find((m) => m.title === result.citedSourceTitle) || matched[0] || null;
+    citedByModel || (result.verdict === "unverified" ? null : matched[0]) || null;
   const sourceCitation = topSource
     ? { title: topSource.title, url: topSource.url }
     : null;
