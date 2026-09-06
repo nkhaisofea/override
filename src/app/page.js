@@ -8,6 +8,7 @@ import { Card, InteractiveCard, PillButton, SectionLabel } from "@/components/Ca
 import { StatusDot, RISK_CONFIG, useStatusLabels } from "@/components/StatusBadge";
 import TrendingSection from "@/components/TrendingSection";
 import UiLanguagePicker from "@/components/UiLanguagePicker";
+import InstallPrompt from "@/components/InstallPrompt";
 import { useSpeechInput } from "@/lib/useSpeechInput";
 import { useUiLanguage } from "@/lib/uiLanguage";
 import { FadeUp, Stagger, StaggerItem, Pressable, Glow, DELAY } from "@/components/motion";
@@ -92,6 +93,41 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setHistory(getHistory());
     setPortfolio(getPortfolioCounts());
+  }, []);
+
+  // Entry points that arrive as query params rather than as a separate route.
+  //
+  //   ?share_text=... — the Web Share Target declared in manifest.json. Once
+  //     Vitaura is installed, it appears in the Android share sheet, so a
+  //     forwarded WhatsApp message can be sent here directly instead of being
+  //     copied and pasted. That is the whole flow this app exists for, so the
+  //     shared text lands pre-filled in the composer, ready to submit.
+  //
+  //   ?action=check — the manifest shortcut (long-press the app icon), which
+  //     promises to go straight to checking something. It only has to focus
+  //     the box.
+  //
+  // Read from window.location rather than useSearchParams: this page is a
+  // client component, and useSearchParams would force it (and everything under
+  // it) behind a Suspense boundary for no gain here.
+  //
+  // The params are then stripped from the URL so a reload — or a shared link
+  // saved to history — doesn't silently re-fill the box with an old message.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const shared = [params.get("share_text"), params.get("share_url")]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    const wantsCheck = params.get("action") === "check";
+    if (!shared && !wantsCheck) return;
+
+    // Same reason as the history effect above: the query string is only
+    // readable on the client, so this cannot be an initial state value.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (shared) setText(shared.slice(0, MAX_CLAIM_LENGTH));
+    textareaRef.current?.focus();
+    window.history.replaceState(null, "", window.location.pathname);
   }, []);
 
   function goToResult(data) {
@@ -215,6 +251,10 @@ export default function HomePage() {
               <p className="mt-3 mb-6 text-base leading-relaxed text-muted lg:mb-8">
                 {t.heroSubtitle}
               </p>
+            </StaggerItem>
+
+            <StaggerItem>
+              <InstallPrompt />
             </StaggerItem>
 
             {/* THE primary action. Pasting a forwarded message is what this
