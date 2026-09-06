@@ -41,6 +41,17 @@ export const metadata = {
   description:
     "Instantly verify health claims against trusted sources, in your own language.",
   manifest: "/manifest.json",
+  // iOS ignores the manifest's icons entirely. Without an explicit
+  // apple-touch-icon, "Add to Home Screen" on an iPhone saves a blurry
+  // screenshot of the page instead of the logo — the single most visible way
+  // an installed PWA looks broken.
+  icons: {
+    icon: [
+      { url: "/icons/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

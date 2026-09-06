@@ -8,7 +8,7 @@ import { maybeCreateAutoFaq } from "./autoFaq";
 // put in front of the model. Set too low and the model gets handed unrelated
 // source text and grounds a verdict in it; too high and everything comes back
 // "unverified". Kept as a named constant so it's tunable in one place.
-const RETRIEVAL_MIN_SCORE = 0.55;
+const RETRIEVAL_MIN_SCORE = 0.6;
 const RETRIEVAL_LIMIT = 3;
 
 // The core verify pipeline, shared by the paste-text flow (/api/claims/check)
