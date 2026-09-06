@@ -535,6 +535,11 @@ const TRANSLATION_SCHEMA = {
   properties: {
     claim: { type: "STRING" },
     explanation: { type: "STRING" },
+    // Source titles ride along in the SAME call rather than getting their own.
+    // A citation reading "WHO: Vaccines and autism" under an otherwise fully
+    // Malay page is exactly the kind of half-translated seam this is meant to
+    // remove, and folding it in here costs nothing extra.
+    sourceTitles: { type: "ARRAY", items: { type: "STRING" } },
   },
   required: ["claim", "explanation"],
 };
@@ -548,14 +553,19 @@ Translate both into the requested language, faithfully. Rules:
   published; your translation must not imply a different conclusion.
 - Do NOT add, remove or "correct" any fact, caveat or recommendation.
 - Keep the register plain and readable for a non-expert on a phone.
-- Keep proper nouns, organisation names (WHO, CDC, KKM) and numbers exactly as they are.
+- Keep proper nouns, organisation names (WHO, CDC, KKM, ASPCA) and numbers exactly as they
+  are. In a source title such as "WHO: Vaccines and autism", translate the descriptive part
+  but leave the organisation's name untouched — the reader needs to recognise who published
+  it.
+- "sourceTitles" must come back as an array of the SAME length and in the SAME order as the
+  titles you were given. If you were given none, return an empty array.
 - If the text is already in the requested language, return it unchanged.`;
 
 /**
  * Translate an already-decided result into another language.
  * @returns {Promise<{claim: string, explanation: string}>}
  */
-export async function translateResult({ claim, explanation, language }) {
+export async function translateResult({ claim, explanation, sourceTitles = [], language }) {
   const languageName = LANGUAGE_NAMES[language] || "English";
 
   const data = await callGemini(`${GENERATION_MODEL}:generateContent`, {
@@ -575,6 +585,11 @@ ${claim}
 Explanation:
 """
 ${explanation}
+"""
+
+Source titles to translate (${sourceTitles.length}), in order:
+"""
+${sourceTitles.length ? sourceTitles.map((title, i) => `${i + 1}. ${title}`).join("\n") : "(none)"}
 """`,
           },
         ],
@@ -591,8 +606,109 @@ ${explanation}
   });
 
   const parsed = JSON.parse(extractText(data, "translation"));
+
+  // Only accept the titles if the model returned exactly as many as it was
+  // given. A short or long array means they can no longer be matched up
+  // positionally, and mislabelling a citation is worse than leaving it in
+  // English — so in that case the originals are kept.
+  const titles = Array.isArray(parsed.sourceTitles) ? parsed.sourceTitles : [];
+  const sourceTitlesOut =
+    titles.length === sourceTitles.length ? titles.map(String) : sourceTitles;
+
   return {
     claim: String(parsed.claim || claim),
     explanation: String(parsed.explanation || explanation),
+    sourceTitles: sourceTitlesOut,
   };
+}
+
+// ---------------------------------------------------------------------------
+// FAQ translation
+//
+// Batched deliberately. A FAQ page shows ten or more entries, and translating
+// them one at a time would spend ten generations — half a day's free-tier
+// budget — to render a single page in Malay. One call handles the whole page,
+// and the caller caches each entry so the second visitor in that language
+// pays nothing at all.
+// ---------------------------------------------------------------------------
+
+const FAQ_TRANSLATION_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    entries: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          id: { type: "STRING" },
+          title: { type: "STRING" },
+          body: { type: "STRING" },
+        },
+        required: ["id", "title", "body"],
+      },
+    },
+  },
+  required: ["entries"],
+};
+
+const FAQ_TRANSLATION_SYSTEM_INSTRUCTION = `You translate published health FAQ entries for
+Vitaura. Each entry has an id, a title phrased as a question, and a short body answering it.
+
+Translate the title and body of every entry into the requested language. Rules:
+- Return every entry you were given, with its "id" copied back EXACTLY and unchanged.
+- Do not change the meaning, and do not add, remove or "correct" any fact or caveat. These
+  answers are already published and source-backed.
+- Keep the title phrased as a question.
+- Keep organisation names (WHO, CDC, KKM, ASPCA) and numbers exactly as they are.
+- Keep the register plain and readable for a non-expert on a phone.
+- If an entry is already in the requested language, return it unchanged.`;
+
+/**
+ * Translate several FAQ entries in one call.
+ *
+ * @param {{id: string, title: string, body: string}[]} entries
+ * @param {string} language
+ * @returns {Promise<Record<string, {title: string, body: string}>>} keyed by id
+ */
+export async function translateFaqEntries({ entries, language }) {
+  if (!entries.length) return {};
+  const languageName = LANGUAGE_NAMES[language] || "English";
+
+  const data = await callGemini(`${GENERATION_MODEL}:generateContent`, {
+    systemInstruction: { parts: [{ text: FAQ_TRANSLATION_SYSTEM_INSTRUCTION }] },
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `Target language: ${languageName}
+
+Entries to translate (JSON):
+${JSON.stringify(entries.map((e) => ({ id: e.id, title: e.title, body: e.body })))}`,
+          },
+        ],
+      },
+    ],
+    safetySettings: SAFETY_SETTINGS,
+    generationConfig: {
+      temperature: 0.1,
+      responseMimeType: "application/json",
+      responseSchema: FAQ_TRANSLATION_SCHEMA,
+    },
+  });
+
+  const parsed = JSON.parse(extractText(data, "FAQ translation"));
+  const known = new Set(entries.map((e) => e.id));
+  const out = {};
+
+  for (const entry of parsed.entries || []) {
+    // Ignore ids we didn't ask about: matching by id rather than by position
+    // means a dropped or reordered entry degrades to "left untranslated"
+    // instead of silently attaching one entry's answer to another's question.
+    if (!entry?.id || !known.has(entry.id)) continue;
+    if (!entry.title || !entry.body) continue;
+    out[entry.id] = { title: String(entry.title), body: String(entry.body) };
+  }
+
+  return out;
 }

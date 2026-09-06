@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { InteractiveCard, SectionLabel } from "@/components/Card";
 import { VerdictBadge } from "@/components/StatusBadge";
+import { useUiLanguage } from "@/lib/uiLanguage";
+import { useFaqTranslations } from "@/lib/useFaqTranslations";
 
 // "Trending right now" — surfaces claims that either (a) enough distinct
 // people asked about recently that the auto-FAQ clustering flagged them, or
@@ -12,7 +14,12 @@ import { VerdictBadge } from "@/components/StatusBadge";
 // something in. See /api/trending and lib/autoFaq.js for how items get here.
 export default function TrendingSection() {
   const router = useRouter();
+  const { t } = useUiLanguage();
   const [items, setItems] = useState(null);
+  // Trending cards render the same posts as /faq, so they translate through
+  // the same cache — a reader who has already loaded the FAQ page in Malay
+  // gets these for free.
+  const { localise } = useFaqTranslations(items);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -35,14 +42,16 @@ export default function TrendingSection() {
     <section className="mb-8">
       <div className="mb-2 flex items-center gap-2">
         <span className="inline-block size-1.5 animate-pulse rounded-full bg-danger" aria-hidden="true" />
-        <SectionLabel>Trending right now</SectionLabel>
+        <SectionLabel>{t.trendingNow}</SectionLabel>
       </div>
 
       {/* Mobile: a horizontal snap rail that bleeds to the screen edges.
           Laptop: a plain stack in the sidebar, where there's vertical room and
           a sideways scroller would be the wrong affordance. */}
       <div className="no-scrollbar -mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 sm:-mx-8 sm:px-8 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0">
-        {items.map((item) => (
+        {items.map((raw) => {
+          const item = localise(raw);
+          return (
           <InteractiveCard
             key={item.id}
             as="button"
@@ -71,10 +80,15 @@ export default function TrendingSection() {
             </div>
             <p className="mb-1 line-clamp-2 text-sm font-medium leading-snug">{item.title}</p>
             <p className="line-clamp-3 text-xs leading-relaxed text-muted">
-              {item.exampleText || item.body}
+              {/* body is the FAQ answer and gets translated; exampleText is
+                  the asker's raw wording and does not. Prefer the body so a
+                  translated page doesn't show a translated title above an
+                  untranslated preview. */}
+              {item.body || item.exampleText}
             </p>
           </InteractiveCard>
-        ))}
+          );
+        })}
       </div>
     </section>
   );

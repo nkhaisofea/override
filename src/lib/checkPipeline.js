@@ -146,6 +146,12 @@ export async function runCheckPipeline({ text, language, sessionId, inputType = 
 
   return {
     id: inserted.insertedId.toString(),
+    // The user's own words, returned verbatim. The caller stores THIS in the
+    // device history and shows it back on the result page, because "what did I
+    // ask?" must be answerable in the exact wording the person used — an
+    // AI-rewritten paraphrase there quietly makes people doubt their own
+    // memory of what they sent.
+    text,
     claim: result.claim,
     verdict,
     riskLevel,

@@ -1,6 +1,9 @@
 import localFont from "next/font/local";
+import { cookies } from "next/headers";
 import "./globals.css";
 import DevServiceWorkerCleanup from "@/components/DevServiceWorkerCleanup";
+import { UiLanguageProvider } from "@/lib/uiLanguage";
+import { SUPPORTED_LANGUAGES, UI_LANGUAGE_COOKIE } from "@/lib/i18n";
 
 // Self-hosted (not next/font/google) so the build never depends on network
 // access to fonts.googleapis.com — matters both for this sandbox's
@@ -57,10 +60,21 @@ export const viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  // Read the interface-language preference on the SERVER so the first paint is
+  // already correct. Reading it on the client instead would render English and
+  // then correct itself — a flash that is most confusing for exactly the people
+  // who picked another language in the first place.
+  //
+  // This makes the layout dynamic, which is the intended trade: the app is
+  // personalised (history, language) and has nothing worth statically caching.
+  const store = await cookies();
+  const cookieLang = store.get(UI_LANGUAGE_COOKIE)?.value;
+  const uiLanguage = SUPPORTED_LANGUAGES.includes(cookieLang) ? cookieLang : "en";
+
   return (
     <html
-      lang="en"
+      lang={uiLanguage}
       className={`h-full antialiased ${displayFont.variable} ${bodyFont.variable}`}
       suppressHydrationWarning
     >
@@ -72,7 +86,7 @@ export default function RootLayout({ children }) {
             production build, which would otherwise serve stale precached
             chunks to the dev server. No-op (and dead code) in production. */}
         <DevServiceWorkerCleanup />
-        {children}
+        <UiLanguageProvider initialLanguage={uiLanguage}>{children}</UiLanguageProvider>
       </body>
     </html>
   );

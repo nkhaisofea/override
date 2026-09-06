@@ -61,6 +61,7 @@ export async function POST(request, { params }) {
         language,
         claim: claim.claim || claim.text,
         explanation: claim.explanation || "",
+        sourceTitles: (claim.supportingSources || []).map((s) => s.title),
         cached: true,
       });
     }
@@ -70,9 +71,14 @@ export async function POST(request, { params }) {
       return NextResponse.json({ ...cached, language, cached: true });
     }
 
+    // Source titles ride along in the same call — a citation left in English
+    // under an otherwise translated page is the most visible seam there is.
+    const sourceTitles = (claim.supportingSources || []).map((s) => s.title);
+
     const translated = await translateResult({
       claim: claim.claim || claim.text,
       explanation: claim.explanation || "",
+      sourceTitles,
       language,
     });
 

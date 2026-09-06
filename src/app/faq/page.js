@@ -6,6 +6,9 @@ import { useSearchParams } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { Card, PillButton } from "@/components/Card";
 import { VerdictBadge } from "@/components/StatusBadge";
+import UiLanguagePicker from "@/components/UiLanguagePicker";
+import { useUiLanguage } from "@/lib/uiLanguage";
+import { useFaqTranslations } from "@/lib/useFaqTranslations";
 
 export default function FaqPage() {
   return (
@@ -27,6 +30,7 @@ function FaqSkeleton() {
 }
 
 function FaqPageInner() {
+  const { t } = useUiLanguage();
   const searchParams = useSearchParams();
   const [data, setData] = useState({ posts: [], tags: [] });
   const [query, setQuery] = useState(searchParams.get("q") || "");
@@ -67,37 +71,41 @@ function FaqPageInner() {
   }, [query, activeTag]);
 
   const { posts, tags } = data;
+  // Entries are stored in the language they were written in; this renders them
+  // in the language the reader chose. One batched call per page, then cached.
+  const { localise } = useFaqTranslations(posts);
 
   return (
     <main className="mx-auto w-full max-w-md px-5 pt-8 pb-16 sm:max-w-3xl sm:px-8 lg:max-w-5xl lg:pt-12">
       <header className="mb-8 flex items-center justify-between">
         <Logo href="/" />
-        <Link
-          href="/"
-          className="label-tracked text-[11px] text-muted transition-colors hover:text-accent"
-        >
-          Check a claim
-        </Link>
+        <div className="flex items-center gap-3">
+          <UiLanguagePicker />
+          <Link
+            href="/"
+            className="min-h-11 py-2 text-sm text-muted transition-colors hover:text-accent"
+          >
+            {t.checkAClaim}
+          </Link>
+        </div>
       </header>
 
       <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl lg:text-4xl">
-        Health FAQs
+        {t.faqTitle}
       </h1>
-      <p className="mt-1 mb-5 text-sm leading-relaxed text-muted">
-        Claims checked so often we&apos;ve turned them into quick answers.
-      </p>
+      <p className="mt-2 mb-5 text-base leading-relaxed text-muted">{t.faqSubtitle}</p>
 
       <div className="mb-4">
         <label htmlFor="faq-search" className="sr-only">
-          Search health FAQs
+          {t.faqSearch}
         </label>
         <input
           id="faq-search"
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search topics…"
-          className="field rounded-full"
+          placeholder={t.faqSearch}
+          className="field min-h-12 rounded-full text-base"
         />
       </div>
 
@@ -106,7 +114,7 @@ function FaqPageInner() {
       {tags.length > 0 && (
         <div className="no-scrollbar mb-6 flex gap-2 overflow-x-auto pb-1">
           <FilterChip active={!activeTag} onClick={() => setActiveTag("")}>
-            All
+            {t.faqAll}
           </FilterChip>
           {tags.map((tag) => (
             <FilterChip
@@ -125,9 +133,7 @@ function FaqPageInner() {
       {!loading && posts.length === 0 && (
         <Card className="text-center">
           <p className="text-sm text-muted">
-            {query || activeTag
-              ? "No FAQs match that. Try a different search or topic."
-              : "No FAQ entries yet — check back soon."}
+            {query || activeTag ? t.faqNoMatch : t.faqEmpty}
           </p>
           {(query || activeTag) && (
             <PillButton
@@ -138,7 +144,7 @@ function FaqPageInner() {
                 setActiveTag("");
               }}
             >
-              Clear filters
+              {t.clearFilters}
             </PillButton>
           )}
         </Card>
@@ -147,15 +153,17 @@ function FaqPageInner() {
       {/* One column on a phone, two from md — FAQ entries are short and
           independent, so they tile well once there's width for it. */}
       <div className="grid gap-3 md:grid-cols-2">
-        {posts.map((post) => (
+        {posts.map((raw) => {
+          const post = localise(raw);
+          return (
           <Card key={post.id} className="flex flex-col">
             <div className="mb-2 flex items-start justify-between gap-2">
-              <h2 className="text-sm leading-snug font-semibold">{post.title}</h2>
+              <h2 className="text-base leading-snug font-semibold">{post.title}</h2>
               <div className="flex shrink-0 items-center gap-1">
                 {post.verdict && <VerdictBadge verdict={post.verdict} />}
               </div>
             </div>
-            <p className="mb-3 flex-1 text-xs leading-relaxed text-muted">{post.body}</p>
+            <p className="mb-3 flex-1 text-sm leading-relaxed text-muted">{post.body}</p>
             <div className="flex items-center justify-between gap-2 text-[11px] text-muted">
               <div className="flex min-w-0 items-center gap-2">
                 {post.topicTag && (
@@ -189,12 +197,13 @@ function FaqPageInner() {
                   rel="noreferrer"
                   className="shrink-0 text-accent hover:underline"
                 >
-                  Source ↗
+                  {t.sourceLink} ↗
                 </a>
               )}
             </div>
           </Card>
-        ))}
+          );
+        })}
       </div>
     </main>
   );

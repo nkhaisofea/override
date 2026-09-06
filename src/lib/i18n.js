@@ -36,6 +36,16 @@ export const SPEECH_LOCALES = {
 
 export const SUPPORTED_LANGUAGES = LANGUAGES.map((l) => l.code);
 
+// Name of the interface-language cookie.
+//
+// It lives HERE, in a plain module, rather than beside the provider — the
+// provider is a "use client" module, and a non-component export imported from
+// one into a server component arrives as an opaque client reference, not the
+// string. `cookies().get(<reference>)` then silently returns undefined, so the
+// server renders English no matter what the cookie says. That failure is
+// completely silent: no error, no warning, just the wrong language.
+export const UI_LANGUAGE_COOKIE = "vitaura_ui_lang";
+
 const STRINGS = {
   en: {
     claimChecked: "Claim checked",
@@ -195,4 +205,288 @@ export function t(language) {
 export function rationaleText(key, language) {
   const table = { ...RATIONALE.en, ...(RATIONALE[language] || {}) };
   return table[key] || RATIONALE.en.wrong;
+}
+
+// ---------------------------------------------------------------------------
+// Interface language
+//
+// This is a SEPARATE axis from the answer language above.
+//
+//   Answer language  — what language a verdict is written in. Belongs to the
+//                      claim, is decided at check time, and is translated by
+//                      the model on demand (see /api/claims/[id]/translate).
+//   Interface language — what language the app's own chrome is in: headings,
+//                      buttons, labels, placeholders. Belongs to the person,
+//                      persists across visits, costs nothing.
+//
+// Keeping them apart matters. Someone may want the interface in Bahasa Melayu
+// while reading a verdict about an English-language forward exactly as it was
+// written. Collapsing the two would take that choice away.
+// ---------------------------------------------------------------------------
+
+const UI = {
+  en: {
+    // header + nav
+    healthFaqs: "Health FAQs",
+    admin: "Admin",
+    checkAClaim: "Check a claim",
+    backToVitaura: "Back to Vitaura",
+    interfaceLanguage: "Language",
+
+    // home hero
+    heroTitle: "Is this health message true?",
+    heroSubtitle:
+      "Someone sent you something about health. Check it here before you believe it or forward it on.",
+
+    // primary actions
+    scanLabel: "Take a photo or screenshot",
+    scanTitle: "Scan a screenshot or document",
+    scanHelp: "Upload a screenshot, poster or PDF — we'll read the claim out of it.",
+    scanReading: "Reading it now…",
+
+    askLabel: "Speak instead",
+    askHelpIdle: "Say the message out loud",
+    askHelpListening: "Listening… tap to stop",
+    askHelpUnsupported: "Voice needs Chrome, Edge, or Safari",
+
+    pasteLabel: "Type or paste",
+    pasteHelp: "Paste the message you received",
+
+    // composer
+    composerTitle: "Paste the message here",
+    answerLanguage: "Answer language",
+    clear: "Clear",
+    checking: "Checking…",
+    disclaimerShort:
+      "Vitaura checks claims against trusted sources. It is not medical advice — for anything about your own health, talk to a doctor.",
+
+    // sidebar
+    riskPortfolio: "Your checks so far",
+    recentChecks: "Recent checks",
+    searchChecks: "Search your checks…",
+    noChecksMatch: "No checks match",
+    emptyHistory: "Your checks appear here — private to this device, no account needed.",
+    trendingNow: "Trending right now",
+    askedCount: "asked",
+
+    // footer
+    footerTagline: "Vitaura — check health messages before you trust, act, or share.",
+
+    // faq page
+    faqTitle: "Health FAQs",
+    faqSubtitle: "Claims checked so often we've turned them into quick answers.",
+    faqSearch: "Search topics…",
+    faqAll: "All",
+    faqEmpty: "No FAQ entries yet — check back soon.",
+    faqNoMatch: "No FAQs match that. Try a different search or topic.",
+    clearFilters: "Clear filters",
+    sourceLink: "Source",
+    youAsked: "What you asked",
+    yourExactWords: "Your message, exactly as you sent it",
+  },
+
+  ms: {
+    healthFaqs: "Soalan Lazim",
+    admin: "Admin",
+    checkAClaim: "Semak dakwaan",
+    backToVitaura: "Kembali ke Vitaura",
+    interfaceLanguage: "Bahasa",
+
+    heroTitle: "Betulkah mesej kesihatan ini?",
+    heroSubtitle:
+      "Ada orang hantar sesuatu tentang kesihatan. Semak di sini sebelum anda percaya atau kongsi kepada orang lain.",
+
+    scanLabel: "Ambil gambar atau tangkap layar",
+    scanTitle: "Imbas tangkap layar atau dokumen",
+    scanHelp: "Muat naik tangkap layar, poster atau PDF — kami akan baca dakwaannya.",
+    scanReading: "Sedang membaca…",
+
+    askLabel: "Cakap sahaja",
+    askHelpIdle: "Sebut mesej itu dengan kuat",
+    askHelpListening: "Sedang mendengar… tekan untuk berhenti",
+    askHelpUnsupported: "Suara perlukan Chrome, Edge atau Safari",
+
+    pasteLabel: "Taip atau tampal",
+    pasteHelp: "Tampal mesej yang anda terima",
+
+    composerTitle: "Tampal mesej di sini",
+    answerLanguage: "Bahasa jawapan",
+    clear: "Padam",
+    checking: "Sedang semak…",
+    disclaimerShort:
+      "Vitaura menyemak dakwaan dengan sumber dipercayai. Ini bukan nasihat perubatan — untuk hal kesihatan anda sendiri, jumpa doktor.",
+
+    riskPortfolio: "Semakan anda setakat ini",
+    recentChecks: "Semakan terkini",
+    searchChecks: "Cari semakan anda…",
+    noChecksMatch: "Tiada semakan sepadan",
+    emptyHistory:
+      "Semakan anda akan muncul di sini — peribadi pada peranti ini, tanpa akaun.",
+    trendingNow: "Sedang hangat sekarang",
+    askedCount: "orang tanya",
+
+    footerTagline:
+      "Vitaura — semak mesej kesihatan sebelum anda percaya, bertindak atau kongsi.",
+
+    faqTitle: "Soalan Lazim Kesihatan",
+    faqSubtitle: "Dakwaan yang kerap disemak, kami jadikan jawapan ringkas.",
+    faqSearch: "Cari topik…",
+    faqAll: "Semua",
+    faqEmpty: "Belum ada soalan lazim — sila kembali nanti.",
+    faqNoMatch: "Tiada yang sepadan. Cuba carian atau topik lain.",
+    clearFilters: "Kosongkan penapis",
+    sourceLink: "Sumber",
+    youAsked: "Apa yang anda tanya",
+    yourExactWords: "Mesej anda, tepat seperti yang anda hantar",
+  },
+
+  zh: {
+    healthFaqs: "健康常见问题",
+    admin: "管理员",
+    checkAClaim: "查证说法",
+    backToVitaura: "返回 Vitaura",
+    interfaceLanguage: "语言",
+
+    heroTitle: "这条健康消息是真的吗？",
+    heroSubtitle: "有人发给你一条健康消息。在相信或转发之前，先在这里查一查。",
+
+    scanLabel: "拍照或截图",
+    scanTitle: "扫描截图或文件",
+    scanHelp: "上传截图、海报或 PDF —— 我们会读出其中的说法。",
+    scanReading: "正在读取…",
+
+    askLabel: "直接说话",
+    askHelpIdle: "把消息念出来",
+    askHelpListening: "正在聆听… 点击停止",
+    askHelpUnsupported: "语音需要 Chrome、Edge 或 Safari",
+
+    pasteLabel: "输入或粘贴",
+    pasteHelp: "粘贴你收到的消息",
+
+    composerTitle: "在这里粘贴消息",
+    answerLanguage: "回答语言",
+    clear: "清除",
+    checking: "查证中…",
+    disclaimerShort:
+      "Vitaura 会对照可信来源查证说法。这不是医疗建议 —— 有关你自身健康的问题，请咨询医生。",
+
+    riskPortfolio: "你的查证记录",
+    recentChecks: "最近查证",
+    searchChecks: "搜索你的查证…",
+    noChecksMatch: "没有匹配的查证",
+    emptyHistory: "你的查证会显示在这里 —— 仅存于本设备，无需账号。",
+    trendingNow: "当前热门",
+    askedCount: "人问过",
+
+    footerTagline: "Vitaura —— 在相信、照做或转发之前，先查证健康消息。",
+
+    faqTitle: "健康常见问题",
+    faqSubtitle: "被查证得最多的说法，我们整理成了简短答案。",
+    faqSearch: "搜索主题…",
+    faqAll: "全部",
+    faqEmpty: "暂无条目 —— 请稍后再来。",
+    faqNoMatch: "没有匹配的内容。换个搜索词或主题试试。",
+    clearFilters: "清除筛选",
+    sourceLink: "来源",
+    youAsked: "你问的内容",
+    yourExactWords: "你发送的原文，一字未改",
+  },
+
+  ta: {
+    healthFaqs: "சுகாதாரக் கேள்வி பதில்",
+    admin: "நிர்வாகம்",
+    checkAClaim: "கூற்றைச் சரிபார்",
+    backToVitaura: "Vitaura க்குத் திரும்பு",
+    interfaceLanguage: "மொழி",
+
+    heroTitle: "இந்த சுகாதாரச் செய்தி உண்மையா?",
+    heroSubtitle:
+      "யாரோ உங்களுக்கு உடல்நலம் பற்றி ஒரு செய்தி அனுப்பியுள்ளார்கள். நம்புவதற்கு அல்லது பகிர்வதற்கு முன் இங்கே சரிபாருங்கள்.",
+
+    scanLabel: "புகைப்படம் அல்லது திரைப்பிடிப்பு",
+    scanTitle: "திரைப்பிடிப்பு அல்லது ஆவணத்தை ஸ்கேன் செய்",
+    scanHelp: "திரைப்பிடிப்பு, சுவரொட்டி அல்லது PDF ஐ பதிவேற்றவும் — கூற்றை நாங்கள் படிப்போம்.",
+    scanReading: "படிக்கிறது…",
+
+    askLabel: "பேசுங்கள்",
+    askHelpIdle: "செய்தியை சத்தமாகச் சொல்லுங்கள்",
+    askHelpListening: "கேட்கிறது… நிறுத்த தட்டவும்",
+    askHelpUnsupported: "குரலுக்கு Chrome, Edge அல்லது Safari தேவை",
+
+    pasteLabel: "தட்டச்சு அல்லது ஒட்டு",
+    pasteHelp: "நீங்கள் பெற்ற செய்தியை ஒட்டவும்",
+
+    composerTitle: "செய்தியை இங்கே ஒட்டவும்",
+    answerLanguage: "பதில் மொழி",
+    clear: "அழி",
+    checking: "சரிபார்க்கிறது…",
+    disclaimerShort:
+      "Vitaura நம்பகமான ஆதாரங்களுடன் கூற்றுகளைச் சரிபார்க்கிறது. இது மருத்துவ ஆலோசனை அல்ல — உங்கள் உடல்நலம் குறித்து மருத்துவரை அணுகவும்.",
+
+    riskPortfolio: "இதுவரை உங்கள் சரிபார்ப்புகள்",
+    recentChecks: "சமீபத்திய சரிபார்ப்புகள்",
+    searchChecks: "உங்கள் சரிபார்ப்புகளைத் தேடு…",
+    noChecksMatch: "பொருந்தும் சரிபார்ப்பு இல்லை",
+    emptyHistory:
+      "உங்கள் சரிபார்ப்புகள் இங்கே தோன்றும் — இந்த சாதனத்தில் மட்டும், கணக்கு தேவையில்லை.",
+    trendingNow: "இப்போது அதிகம் பேசப்படுவது",
+    askedCount: "பேர் கேட்டனர்",
+
+    footerTagline:
+      "Vitaura — நம்புவதற்கு, செயல்படுவதற்கு அல்லது பகிர்வதற்கு முன் சுகாதாரச் செய்திகளைச் சரிபாருங்கள்.",
+
+    faqTitle: "சுகாதாரக் கேள்வி பதில்கள்",
+    faqSubtitle: "அடிக்கடி சரிபார்க்கப்படும் கூற்றுகளை சுருக்கமான பதில்களாக்கியுள்ளோம்.",
+    faqSearch: "தலைப்புகளைத் தேடு…",
+    faqAll: "அனைத்தும்",
+    faqEmpty: "இதுவரை பதிவுகள் இல்லை — பிறகு பாருங்கள்.",
+    faqNoMatch: "பொருந்தும் பதிவு இல்லை. வேறு தேடல் அல்லது தலைப்பை முயற்சிக்கவும்.",
+    clearFilters: "வடிகட்டிகளை அழி",
+    sourceLink: "ஆதாரம்",
+    youAsked: "நீங்கள் கேட்டது",
+    yourExactWords: "நீங்கள் அனுப்பிய செய்தி, அப்படியே",
+  },
+};
+
+/** Interface strings for a language, falling back to English per-key. */
+export function ui(language) {
+  return { ...UI.en, ...(UI[language] || {}) };
+}
+
+// ---------------------------------------------------------------------------
+// Verdict and risk labels
+//
+// These are the words a user actually reads on a badge, so they follow the
+// INTERFACE language like every other label. Leaving them in English while the
+// rest of the page is Malay was the single most jarring thing on the screen:
+// a fully translated card with "HIGH RISK" stamped on it.
+//
+// Kept short. They sit inside pill badges at small sizes, and a long
+// translation wraps and breaks the layout.
+// ---------------------------------------------------------------------------
+
+const VERDICT_LABELS = {
+  en: { true: "TRUE", false: "FALSE", misleading: "MISLEADING", unverified: "UNVERIFIED" },
+  ms: { true: "BENAR", false: "PALSU", misleading: "MENGELIRUKAN", unverified: "TIDAK PASTI" },
+  zh: { true: "属实", false: "虚假", misleading: "误导", unverified: "无法核实" },
+  ta: { true: "உண்மை", false: "பொய்", misleading: "தவறாக வழிநடத்தும்", unverified: "உறுதிசெய்யப்படவில்லை" },
+};
+
+const RISK_LABELS = {
+  en: { safe: "SAFE", caution: "CAUTION", high_risk: "HIGH RISK" },
+  ms: { safe: "SELAMAT", caution: "BERHATI-HATI", high_risk: "RISIKO TINGGI" },
+  zh: { safe: "安全", caution: "注意", high_risk: "高风险" },
+  ta: { safe: "பாதுகாப்பு", caution: "எச்சரிக்கை", high_risk: "அதிக ஆபத்து" },
+};
+
+/** Localised verdict label, e.g. "PALSU" for false in Malay. */
+export function verdictLabel(verdict, language) {
+  const table = VERDICT_LABELS[language] || VERDICT_LABELS.en;
+  return table[verdict] || VERDICT_LABELS.en.unverified;
+}
+
+/** Localised risk label, e.g. "RISIKO TINGGI" for high_risk in Malay. */
+export function riskLabel(riskLevel, language) {
+  const table = RISK_LABELS[language] || RISK_LABELS.en;
+  return table[riskLevel] || RISK_LABELS.en.caution;
 }
