@@ -74,27 +74,41 @@ export function deriveRiskLevel(verdict, actionRisk) {
 }
 
 /**
- * One-line rationale for the risk level, shown under the badge so the user
- * sees *why* a false claim was rated merely "caution" rather than assuming
- * the app is soft on misinformation.
+ * Which rationale applies, as a stable key rather than an English sentence.
+ *
+ * Returning a key keeps this module language-agnostic: lib/i18n.js maps the
+ * key to Malay, English or Chinese, so switching language on the result page
+ * costs no model call for this part.
  */
-export function riskRationale(verdict, actionRisk, riskLevel) {
+export function riskRationaleKey(verdict, actionRisk, riskLevel) {
+  if (verdict === "true") return "supported";
+
   const score = Number(actionRisk);
-
-  if (verdict === "true") return "Supported by our trusted sources.";
-
-  if (!Number.isFinite(score)) {
-    if (riskLevel === "caution") return "We couldn't confirm this against a trusted source.";
-    return "This claim doesn't hold up against our trusted sources.";
-  }
+  const known =
+    actionRisk !== null && actionRisk !== undefined && actionRisk !== "" &&
+    Number.isFinite(score);
 
   if (verdict === "unverified") {
-    return riskLevel === "high_risk"
-      ? "Unconfirmed, and acting on it could be harmful — treat with care."
-      : "We couldn't confirm this either way against a trusted source.";
+    return riskLevel === "high_risk" ? "unverifiedRisky" : "unverified";
   }
 
-  return riskLevel === "high_risk"
-    ? "Incorrect, and acting on it could cause real harm."
-    : "Incorrect, but unlikely to cause harm on its own.";
+  // false | misleading
+  if (!known) return "wrong";
+  return riskLevel === "high_risk" ? "wrongAndDangerous" : "wrongButHarmless";
+}
+
+/**
+ * English convenience wrapper. The UI goes through lib/i18n.js instead; this
+ * exists so non-localised callers (and the tests) keep a plain string.
+ */
+export function riskRationale(verdict, actionRisk, riskLevel) {
+  const EN = {
+    supported: "Supported by our trusted sources.",
+    unverifiedRisky: "Unconfirmed, and acting on it could be harmful — treat with care.",
+    unverified: "We couldn't confirm this either way against a trusted source.",
+    wrongAndDangerous: "Incorrect, and acting on it could cause real harm.",
+    wrongButHarmless: "Incorrect, but unlikely to cause harm on its own.",
+    wrong: "This claim doesn't hold up against our trusted sources.",
+  };
+  return EN[riskRationaleKey(verdict, actionRisk, riskLevel)];
 }

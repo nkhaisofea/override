@@ -3,11 +3,8 @@ import { notFound } from "next/navigation";
 import { ObjectId } from "mongodb";
 import { getCollections } from "@/lib/mongodb";
 import { Logo } from "@/components/Logo";
-import { Card, PillButton, SectionLabel } from "@/components/Card";
-import { VerdictBadge, RiskBadge, RISK_CONFIG } from "@/components/StatusBadge";
-import { ScoreMeter } from "@/components/ScoreMeter";
-import { riskRationale } from "@/lib/risk";
-import ShareButton from "@/components/ShareButton";
+import { Card, PillButton } from "@/components/Card";
+import ResultView from "@/components/ResultView";
 
 async function getClaim(id) {
   if (!ObjectId.isValid(id)) return null;
@@ -69,102 +66,45 @@ export default async function ResultPage({ params }) {
     );
   }
 
-  const riskCfg = RISK_CONFIG[claim.riskLevel] || RISK_CONFIG.caution;
-  const rationale = riskRationale(claim.verdict, claim.actionRisk, claim.riskLevel);
-  const claimText = claim.claim || claim.text;
+  // Serialise for the client boundary: ObjectId and Date are not
+  // structured-cloneable, so they have to become strings here rather than
+  // failing at render time. `translations` is deliberately dropped — the
+  // client fetches the one language it needs on demand instead of shipping
+  // every cached translation to every visitor.
+  const view = {
+    id: claim._id.toString(),
+    text: claim.text || "",
+    claim: claim.claim || claim.text || "",
+    explanation: claim.explanation || "",
+    verdict: claim.verdict || "unverified",
+    riskLevel: claim.riskLevel || "caution",
+    evidenceConfidence: claim.evidenceConfidence ?? null,
+    actionRisk: claim.actionRisk ?? null,
+    language: claim.language || "en",
+    // Only a definitive verdict carries its evidence to the client.
+    //
+    // Enforced here rather than only in the view: props to a client component
+    // are serialised into the page payload, so filtering in the UI alone would
+    // still ship the citations in the HTML for an "unverified" or "misleading"
+    // result. Withholding them at this boundary means they are genuinely
+    // absent, not merely unrendered. They remain on the claim document for the
+    // admin claims log.
+    ...(claim.verdict === "true" || claim.verdict === "false"
+      ? {
+          sourceCitation: claim.sourceCitation
+            ? { title: claim.sourceCitation.title, url: claim.sourceCitation.url || null }
+            : null,
+          supportingSources: (claim.supportingSources || []).map((s) => ({
+            title: s.title,
+            url: s.url || null,
+            score: s.score ?? null,
+            citedByModel: !!s.citedByModel,
+          })),
+        }
+      : { sourceCitation: null, supportingSources: [] }),
+    overriddenBy: claim.overriddenBy || null,
+    overrideNote: claim.overrideNote || null,
+  };
 
-  return (
-    <main className="mx-auto w-full max-w-md px-5 pt-8 pb-16 sm:max-w-xl sm:px-8 lg:max-w-4xl lg:pt-12">
-      <header className="mb-8 flex items-center justify-between">
-        <Logo href="/" />
-        <ShareButton title={`${(claim.verdict || "").toUpperCase()}: ${claimText}`} />
-      </header>
-
-      {/* The verdict card leads, with a left border in the risk colour so the
-          state is readable before a single word is. */}
-      <SectionLabel className="mb-2">Claim checked</SectionLabel>
-      <Card
-        raised
-        className={`mb-4 border-l-4 ${riskCfg.border} lg:p-7`}
-      >
-        <p className="mb-4 text-base leading-snug sm:text-lg lg:text-xl">{claimText}</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <VerdictBadge verdict={claim.verdict} size="lg" />
-          <RiskBadge riskLevel={claim.riskLevel} />
-        </div>
-        <p className="mt-3 text-xs leading-relaxed text-muted">{rationale}</p>
-        {claim.overriddenBy && (
-          <p className="mt-3 rounded-xl bg-accent-softer px-3 py-2 text-[11px] leading-relaxed text-accent">
-            This verdict was reviewed and corrected by our fact-checking team.
-            {claim.overrideNote ? ` ${claim.overrideNote}` : ""}
-          </p>
-        )}
-      </Card>
-
-      {/* From lg the explanation and the two meters sit side by side rather
-          than stacking into a long scroll. */}
-      <div className="lg:grid lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-start lg:gap-5">
-        <div>
-          <SectionLabel className="mb-2">Why</SectionLabel>
-          <Card className="mb-4 lg:mb-0">
-            <p className="text-sm leading-relaxed">{claim.explanation}</p>
-          </Card>
-        </div>
-
-        {(claim.evidenceConfidence != null || claim.actionRisk != null) && (
-          <div>
-            <SectionLabel className="mb-2">Two-axis read</SectionLabel>
-            <Card className="mb-4 flex flex-col gap-4 lg:mb-0">
-              <ScoreMeter
-                label="Evidence confidence"
-                value={claim.evidenceConfidence}
-                tone="accent"
-                description="How strongly our trusted sources support this claim being true."
-              />
-              <ScoreMeter
-                label="Action risk"
-                value={claim.actionRisk}
-                tone="danger"
-                description="How dangerous it would be to act on this claim if it's wrong."
-              />
-            </Card>
-          </div>
-        )}
-      </div>
-
-      {claim.sourceCitation && (
-        <div className="mt-4">
-          <SectionLabel className="mb-2">Source</SectionLabel>
-          <a
-            href={claim.sourceCitation.url || "#"}
-            target="_blank"
-            rel="noreferrer"
-            className="block rounded-3xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
-            <Card className="flex items-center justify-between gap-3 transition-colors hover:border-accent">
-              <span className="min-w-0 flex-1 text-sm">{claim.sourceCitation.title}</span>
-              <span className="shrink-0 text-accent" aria-hidden="true">
-                ↗
-              </span>
-            </Card>
-          </a>
-        </div>
-      )}
-
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-        <Link href="/" className="flex-1">
-          <PillButton className="w-full">Check another message</PillButton>
-        </Link>
-        <Link href="/faq" className="flex-1">
-          <PillButton variant="outline" className="w-full">
-            Browse health FAQs
-          </PillButton>
-        </Link>
-      </div>
-
-      <p className="mt-6 text-center text-[11px] leading-relaxed text-faint">
-        Not medical advice. For anything about your own health, talk to a clinician.
-      </p>
-    </main>
-  );
+  return <ResultView claim={view} />;
 }

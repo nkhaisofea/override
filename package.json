@@ -10,6 +10,7 @@
     "test": "node --test src/lib/*.test.mjs",
     "seed:admin": "node scripts/seed-admin.mjs",
     "seed:sources": "node scripts/seed-sources.mjs",
+    "embed:sources": "node scripts/embed-sources.mjs",
     "db:indexes": "node scripts/ensure-indexes.mjs"
   },
   "dependencies": {
@@ -17,6 +18,7 @@
     "bcryptjs": "^3.0.3",
     "jsonwebtoken": "^9.0.3",
     "mongodb": "^7.6.0",
+    "motion": "^13.2.0",
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8"

@@ -7,6 +7,8 @@
 // the current model list at https://ai.google.dev/gemini-api/docs/models
 // and update GEMINI_MODEL / GEMINI_EMBEDDING_MODEL accordingly.
 
+import { LANGUAGE_NAMES } from "./i18n";
+
 const API_KEY = process.env.GEMINI_API_KEY;
 const GENERATION_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL || "gemini-embedding-001";
@@ -185,11 +187,8 @@ still assess only the factual claim inside it and note that they should see a cl
 Write the "claim" and "explanation" fields in the requested output language. Leave
 "citedSourceTitle" exactly as the source title was given to you, in its original language.`;
 
-const LANGUAGE_NAMES = {
-  ms: "Bahasa Melayu",
-  en: "English",
-  zh: "Simplified Chinese (中文)",
-};
+// Re-exported from lib/i18n.js so the supported set is defined once. Adding a
+// language there is enough; nothing here needs touching.
 
 // Structured-output schema. Constraining the decode is far more reliable than
 // asking for JSON in the prompt and hoping — it removes the "model wrapped it
@@ -341,7 +340,7 @@ function clampScore(value) {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
-// "Reality Scan" — a screenshot instead of pasted text. Rather than a
+// "Reality Scan" — a screenshot, photo or PDF instead of pasted text. Rather than a
 // separate image-grounded verdict pipeline, this does one small extra step
 // (read the claim out of the image) and then reuses the exact same
 // embed -> retrieve -> checkClaim pipeline as the text flow, so the rest of
@@ -355,13 +354,16 @@ export async function extractClaimFromImage({ imageBase64, mimeType }) {
         parts: [
           {
             text:
-              "This image is a screenshot of a message, post, or forward (e.g. from " +
-              "WhatsApp, TikTok, or Facebook) that may contain a health claim. " +
-              "Transcribe ONLY the visible text that states or implies a health claim. " +
-              "Ignore UI chrome, timestamps, usernames, and unrelated text. " +
+              "This file is a screenshot, photo, poster, leaflet or PDF document that may " +
+              "contain a health claim — for example a WhatsApp forward, a social media post, " +
+              "a flyer, or a circulated document. " +
+              "Find the single main health claim being asserted and transcribe ONLY that. " +
+              "Ignore UI chrome, timestamps, usernames, page numbers, headers, footers and " +
+              "unrelated text. If the document is long and makes several claims, transcribe " +
+              "the most prominent or most consequential one. " +
               "Respond with ONLY the extracted claim text in its original language — " +
               "no commentary, no markdown, no quotes around it. " +
-              "If no health-related claim is visible in the image, respond with exactly: NO_CLAIM_FOUND",
+              "If no health-related claim is present, respond with exactly: NO_CLAIM_FOUND",
           },
           { inlineData: { mimeType, data: imageBase64 } },
         ],
@@ -513,4 +515,84 @@ export async function checkGeminiHealth() {
 
     return { ok: false, status: err?.status ?? null, error: message.slice(0, 200), hint };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Result translation
+//
+// Switching language on a result must NOT re-run the check. Re-running would
+// spend another generation, and worse, could return a different verdict for
+// the same claim — a user toggling BM/EN and watching FALSE become MISLEADING
+// would have every reason to stop trusting the tool.
+//
+// So the verdict, scores and sources are fixed at check time and only the two
+// AI-written strings are translated. Everything else on the page is static
+// copy handled by lib/i18n.js at no cost.
+// ---------------------------------------------------------------------------
+
+const TRANSLATION_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    claim: { type: "STRING" },
+    explanation: { type: "STRING" },
+  },
+  required: ["claim", "explanation"],
+};
+
+const TRANSLATION_SYSTEM_INSTRUCTION = `You are translating the output of a health
+fact-checking tool. You will be given a claim and the explanation of a verdict already
+reached about it.
+
+Translate both into the requested language, faithfully. Rules:
+- Do NOT change, soften or strengthen the meaning. The verdict has already been decided and
+  published; your translation must not imply a different conclusion.
+- Do NOT add, remove or "correct" any fact, caveat or recommendation.
+- Keep the register plain and readable for a non-expert on a phone.
+- Keep proper nouns, organisation names (WHO, CDC, KKM) and numbers exactly as they are.
+- If the text is already in the requested language, return it unchanged.`;
+
+/**
+ * Translate an already-decided result into another language.
+ * @returns {Promise<{claim: string, explanation: string}>}
+ */
+export async function translateResult({ claim, explanation, language }) {
+  const languageName = LANGUAGE_NAMES[language] || "English";
+
+  const data = await callGemini(`${GENERATION_MODEL}:generateContent`, {
+    systemInstruction: { parts: [{ text: TRANSLATION_SYSTEM_INSTRUCTION }] },
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `Target language: ${languageName}
+
+Claim:
+"""
+${claim}
+"""
+
+Explanation:
+"""
+${explanation}
+"""`,
+          },
+        ],
+      },
+    ],
+    safetySettings: SAFETY_SETTINGS,
+    generationConfig: {
+      // Translation is not a creative task; near-zero temperature keeps it
+      // faithful and makes repeat calls for the same text consistent.
+      temperature: 0.1,
+      responseMimeType: "application/json",
+      responseSchema: TRANSLATION_SCHEMA,
+    },
+  });
+
+  const parsed = JSON.parse(extractText(data, "translation"));
+  return {
+    claim: String(parsed.claim || claim),
+    explanation: String(parsed.explanation || explanation),
+  };
 }

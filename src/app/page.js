@@ -8,6 +8,8 @@ import { Card, InteractiveCard, PillButton, SectionLabel } from "@/components/Ca
 import { StatusDot, RISK_CONFIG, VERDICT_CONFIG } from "@/components/StatusBadge";
 import TrendingSection from "@/components/TrendingSection";
 import { useSpeechInput } from "@/lib/useSpeechInput";
+import { LANGUAGES } from "@/lib/i18n";
+import { FadeUp, Stagger, StaggerItem, Pressable, Glow, DELAY } from "@/components/motion";
 import {
   getSessionId,
   getHistory,
@@ -15,19 +17,19 @@ import {
   getPortfolioCounts,
 } from "@/lib/clientHistory";
 
-const LANGUAGES = [
-  { code: "ms", label: "Bahasa Melayu", short: "BM" },
-  { code: "en", label: "English", short: "EN" },
-  { code: "zh", label: "中文", short: "中文" },
-];
-
 // Submit button copy per language — the button is the one control that has to
 // read natively, since it's the moment the user commits.
-const SUBMIT_LABEL = { ms: "Semak sekarang", en: "Check now", zh: "立即查证" };
+const SUBMIT_LABEL = {
+  ms: "Semak sekarang",
+  en: "Check now",
+  zh: "立即查证",
+  ta: "இப்போது சரிபார்",
+};
 const PLACEHOLDER = {
   ms: "Tampal mesej, siaran, atau dakwaan yang anda mahu semak…",
   en: "Paste the forwarded message, post, or claim you want to check…",
   zh: "粘贴你想查证的转发消息、帖子或说法…",
+  ta: "நீங்கள் சரிபார்க்க விரும்பும் செய்தி அல்லது கூற்றை ஒட்டவும்…",
 };
 
 const MAX_SCAN_BYTES = 8 * 1024 * 1024; // 8MB — generous for a phone screenshot
@@ -128,12 +130,12 @@ export default function HomePage() {
     if (!file || scanLoading) return;
 
     setScanError("");
-    if (!file.type.startsWith("image/")) {
-      setScanError("Please choose an image file.");
+    if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
+      setScanError("Please choose an image or a PDF.");
       return;
     }
     if (file.size > MAX_SCAN_BYTES) {
-      setScanError("That image is too large — try a smaller screenshot.");
+      setScanError("That file is too large — try a smaller screenshot or document.");
       return;
     }
 
@@ -178,7 +180,7 @@ export default function HomePage() {
     // and everything ambient (portfolio, trending, history) moves into a
     // sticky rail on the right instead of being buried below the fold.
     <main className="aura mx-auto w-full max-w-md px-5 pt-8 pb-16 sm:max-w-xl sm:px-8 lg:max-w-6xl lg:pt-12">
-      <header className="mb-8 flex items-center justify-between lg:mb-12">
+      <FadeUp as="header" className="mb-8 flex items-center justify-between lg:mb-12" y={0} delay={DELAY.immediate}>
         <Logo />
         <div className="flex items-center gap-4">
           <Link
@@ -189,30 +191,37 @@ export default function HomePage() {
           </Link>
           <LivePulse />
         </div>
-      </header>
+      </FadeUp>
 
       <div className="lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-start lg:gap-10">
         {/* ---------------- Left column: the check flow ---------------- */}
         <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
-            Your health reality layer
-          </h1>
-          <p className="mt-2 mb-6 text-sm leading-relaxed text-muted sm:text-base lg:mb-8">
-            What did you receive? Check it before you trust, act, or share.
-          </p>
+          <Stagger delay={DELAY.first}>
+          <StaggerItem>
+            <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
+              Your health reality layer
+            </h1>
+            <p className="mt-2 mb-6 text-sm leading-relaxed text-muted sm:text-base lg:mb-8">
+              What did you receive? Check it before you trust, act, or share.
+            </p>
+          </StaggerItem>
+
+          <StaggerItem>
 
           {/* Reality Scan — the large accent-filled primary action from the
               reference design. A styled <label> wrapping a visually hidden
               file input, so it stays a real form control for keyboard and
               screen-reader users. */}
+          <Glow className="mb-3 rounded-3xl" delay={DELAY.second}>
+          <Pressable disabled={scanLoading}>
           <label
-            className={`group relative mb-3 block cursor-pointer rounded-3xl bg-accent p-5 text-on-accent transition-transform focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent sm:p-6 ${
+            className={`group relative block cursor-pointer rounded-3xl bg-accent p-5 text-on-accent transition-transform focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent sm:p-6 ${
               scanLoading ? "opacity-70" : "active:scale-[0.99]"
             }`}
           >
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,application/pdf"
               onChange={handleScanFile}
               disabled={scanLoading}
               className="sr-only"
@@ -221,10 +230,10 @@ export default function HomePage() {
               <div>
                 <p className="label-tracked text-xs opacity-70">Reality Scan</p>
                 <p className="mt-1.5 font-display text-xl font-semibold sm:text-2xl">
-                  {scanLoading ? "Reading screenshot…" : "Scan a screenshot"}
+                  {scanLoading ? "Reading it now…" : "Scan a screenshot or document"}
                 </p>
                 <p className="mt-1 text-xs opacity-80 sm:text-sm">
-                  Upload a poster or forward — we&apos;ll read the claim out of it.
+                  Upload a screenshot, poster or PDF — we&apos;ll read the claim out of it.
                 </p>
               </div>
               <span
@@ -235,6 +244,10 @@ export default function HomePage() {
               </span>
             </div>
           </label>
+          </Pressable>
+          </Glow>
+          </StaggerItem>
+
           {scanError && (
             <p className="mb-3 text-xs text-danger" role="alert">
               {scanError}
@@ -242,6 +255,7 @@ export default function HomePage() {
           )}
 
           {/* Secondary actions */}
+          <StaggerItem>
           <div className="mb-4 grid grid-cols-2 gap-3">
             <InteractiveCard
               as="button"
@@ -283,6 +297,9 @@ export default function HomePage() {
               </p>
             </InteractiveCard>
           </div>
+          </StaggerItem>
+
+          <StaggerItem>
 
           {/* The composer — the must-have flow, always visible rather than
               hidden behind one of the cards above. */}
@@ -319,7 +336,9 @@ export default function HomePage() {
 
               <fieldset className="mt-3 mb-4">
                 <legend className="sr-only">Answer language</legend>
-                <div className="flex gap-2">
+                {/* 2x2 on phones: four pills in one row leaves too little
+                    width once Tamil's label is in the set. */}
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {LANGUAGES.map((l) => {
                     const active = language === l.code;
                     return (
@@ -328,7 +347,7 @@ export default function HomePage() {
                         key={l.code}
                         onClick={() => setLanguage(l.code)}
                         aria-pressed={active}
-                        className={`label-tracked flex-1 rounded-full border px-2 py-2.5 text-[11px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                        className={`label-tracked rounded-full border px-2 py-2.5 text-[11px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                           active
                             ? "border-accent bg-accent-soft text-accent"
                             : "border-border bg-transparent text-muted hover:border-border-strong hover:text-foreground"
@@ -362,10 +381,12 @@ export default function HomePage() {
             Vitaura checks claims against trusted sources. It isn&apos;t medical advice —
             for anything about your own health, talk to a clinician.
           </p>
+          </StaggerItem>
+          </Stagger>
         </div>
 
         {/* ---------------- Right column: ambient context ---------------- */}
-        <aside className="mt-10 lg:sticky lg:top-12 lg:mt-0">
+        <FadeUp as="aside" className="mt-10 lg:sticky lg:top-12 lg:mt-0" delay={DELAY.fourth}>
           <SectionLabel className="mb-2">Risk portfolio</SectionLabel>
           <div className="mb-8 grid grid-cols-3 gap-3">
             {RISK_ORDER.map((key) => (
@@ -458,14 +479,14 @@ export default function HomePage() {
             </Card>
           )}
 
-        </aside>
+        </FadeUp>
       </div>
 
       {/* Site footer. The admin entrance lives here rather than in the header:
           it's for one or two people, not the public, so it shouldn't compete
           with the check flow — but it does need to be findable without
           knowing to type /admin by hand. */}
-      <footer className="mt-12 border-t border-border pt-6">
+      <FadeUp as="footer" className="mt-12 border-t border-border pt-6" delay={DELAY.last}>
         <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
           <p className="text-[11px] text-faint">
             Vitaura — verify health claims before you trust, act, or share.
@@ -488,7 +509,7 @@ export default function HomePage() {
             </Link>
           </nav>
         </div>
-      </footer>
+      </FadeUp>
     </main>
   );
 }

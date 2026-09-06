@@ -3,9 +3,19 @@ import { extractClaimFromImage, GeminiError } from "@/lib/gemini";
 import { DatabaseUnavailableError } from "@/lib/mongodb";
 import { runCheckPipeline } from "@/lib/checkPipeline";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
+import { SUPPORTED_LANGUAGES } from "@/lib/i18n";
 
-const SUPPORTED_LANGUAGES = ["ms", "en", "zh"];
-const SUPPORTED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+// Gemini accepts PDFs as inline data alongside images, so "scan a document"
+// needs no PDF parsing library — the same call handles both, and the rest of
+// the pipeline never learns the difference.
+const SUPPORTED_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "application/pdf",
+];
 // Base64 is ~33% larger than the raw bytes; this caps the raw image at ~8MB,
 // generous for a phone screenshot while keeping the request body sane.
 const MAX_BASE64_LENGTH = 11_000_000;
@@ -38,7 +48,10 @@ export async function POST(request) {
   const sessionId = typeof body.sessionId === "string" ? body.sessionId.slice(0, 100) : null;
 
   if (!imageBase64) {
-    return NextResponse.json({ error: "Please attach a screenshot to check." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Please attach a screenshot or document to check." },
+      { status: 400 }
+    );
   }
   if (!SUPPORTED_MIME_TYPES.includes(mimeType)) {
     return NextResponse.json({ error: "Unsupported image type." }, { status: 400 });
@@ -51,7 +64,10 @@ export async function POST(request) {
     const claimText = await extractClaimFromImage({ imageBase64, mimeType });
     if (!claimText) {
       return NextResponse.json(
-        { error: "Couldn't find a health claim in that image. Try a clearer screenshot, or paste the text instead." },
+        {
+          error:
+            "Couldn't find a health claim in that file. Try a clearer screenshot, or paste the text instead.",
+        },
         { status: 422 }
       );
     }

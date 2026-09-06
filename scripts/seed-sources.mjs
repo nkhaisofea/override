@@ -117,6 +117,66 @@ const SOURCES = [
     topicTags: ["traditional-medicine", "supplements"],
     text: `Traditional and herbal preparations are widely used and some have genuine pharmacological activity, but "natural" does not mean safe or effective. Herbal products can be toxic in themselves, can be contaminated or adulterated with undeclared pharmaceuticals, and can interact dangerously with prescribed medicines — for example affecting blood thinners, blood pressure medication or chemotherapy. Anyone using a traditional preparation should tell their doctor, and should not stop or substitute a prescribed treatment for it without medical advice.`,
   },
+  {
+    title: "WHO: Protein, diet and building muscle",
+    url: "https://www.who.int/news-room/fact-sheets/detail/healthy-diet",
+    topicTags: ["nutrition", "supplements", "exercise"],
+    text: `Dietary protein supplies the amino acids the body uses to build and repair muscle, and adequate protein intake alongside resistance exercise supports muscle growth. Protein alone does not build muscle: the stimulus is the training, and protein supports the adaptation. Most people meet their protein needs from ordinary food such as eggs, fish, poultry, dairy, legumes, tofu and nuts. Protein powders and shakes are a convenience, not a requirement, and offer no advantage over the same amount of protein from food. Very high intakes confer no additional muscle benefit. People with kidney disease should not increase protein intake without medical advice.`,
+  },
+  {
+    title: "WHO: Physical activity and health",
+    url: "https://www.who.int/news-room/fact-sheets/detail/physical-activity",
+    topicTags: ["exercise", "prevention"],
+    text: `Adults should do at least 150 to 300 minutes of moderate-intensity aerobic activity per week, or 75 to 150 minutes of vigorous activity, plus muscle-strengthening activity on two or more days a week. Physical inactivity is a leading risk factor for noncommunicable disease and premature death. Some activity is better than none, and benefits begin below the recommended amounts. Exercise does not need to be intense or done in a gym to count, and no supplement, device or passive treatment substitutes for regular activity.`,
+  },
+  {
+    title: "WHO: Tobacco and e-cigarettes (vaping)",
+    url: "https://www.who.int/news-room/fact-sheets/detail/tobacco",
+    topicTags: ["smoking", "vaping", "cancer"],
+    text: `Tobacco kills up to half of its users. There is no safe level of exposure to tobacco smoke, and secondhand smoke causes disease in non-smokers. Electronic cigarettes are not harmless: their aerosols contain nicotine and other toxicants, nicotine is highly addictive and harms adolescent brain development, and evidence that e-cigarettes help people quit smoking is inconclusive. Light, low-tar, herbal and shisha products are not safer alternatives. Waterpipe smoking exposes users to large volumes of smoke over a single session.`,
+  },
+  {
+    title: "WHO: Hypertension (high blood pressure)",
+    url: "https://www.who.int/news-room/fact-sheets/detail/hypertension",
+    topicTags: ["hypertension", "medication", "prevention"],
+    text: `Hypertension usually causes no symptoms, which is why it is called a silent killer and why it must be detected by measurement rather than by how a person feels. Feeling well is not evidence that blood pressure is controlled. Blood pressure medication should not be stopped or skipped because symptoms are absent, as stopping raises the risk of stroke, heart attack and kidney failure. Reducing salt intake, physical activity, avoiding tobacco and limiting alcohol all help, but they complement prescribed treatment rather than replacing it. Garlic, herbal preparations and blood cleansing remedies are not proven treatments for hypertension.`,
+  },
+  {
+    title: "WHO: Mental health and depression",
+    url: "https://www.who.int/news-room/fact-sheets/detail/depression",
+    topicTags: ["mental-health"],
+    text: `Depression is a common medical condition, not a personal weakness, a lack of faith, or something a person can simply decide to stop feeling. It is distinct from ordinary short-lived sadness. Effective treatments exist, including psychological therapy and, for moderate to severe cases, medication. Antidepressants are not addictive in the way that term is normally used, though they should not be stopped abruptly without medical advice. Telling someone to snap out of it is not treatment. Anyone with thoughts of self-harm should seek help urgently from a health professional or a crisis line.`,
+  },
+  {
+    title: "WHO: Antimicrobial resistance and completing treatment",
+    url: "https://www.who.int/news-room/fact-sheets/detail/antimicrobial-resistance",
+    topicTags: ["antibiotics", "infection"],
+    text: `Antibiotics should only be used when prescribed by a qualified health professional, and never shared with others or saved for later use. Leftover antibiotics from a previous illness, or a course belonging to someone else, may be the wrong drug, the wrong dose or the wrong duration. Taking antibiotics that are not needed accelerates antimicrobial resistance, which already causes millions of deaths each year and makes routine infections, surgery and cancer treatment more dangerous. Follow the prescribing clinician instructions about how long to take the course.`,
+  },
+  {
+    title: "WHO: Breastfeeding and infant nutrition",
+    url: "https://www.who.int/news-room/fact-sheets/detail/infant-and-young-child-feeding",
+    topicTags: ["maternal", "children", "nutrition"],
+    text: `WHO recommends exclusive breastfeeding for the first six months of life, with continued breastfeeding alongside appropriate complementary foods up to two years of age or beyond. Exclusive breastfeeding means no other food or drink, not even water, unless medically indicated. Breastfeeding reduces infant infections and mortality and benefits the mother. Honey should never be given to infants under 12 months because of the risk of infant botulism. Claims that particular foods, teas or supplements dramatically increase milk supply are largely unsupported, and concerns about supply should be raised with a health worker.`,
+  },
+  {
+    title: "WHO: Hydration and water intake",
+    url: "https://www.who.int/news-room/fact-sheets/detail/healthy-diet",
+    topicTags: ["nutrition", "hydration"],
+    text: `Water needs vary with body size, activity, climate and health status, and there is no single figure such as eight glasses a day that applies to everyone. Fluid comes from drinks of all kinds and from food. Thirst is a reasonable guide for most healthy adults. Drinking very large volumes of water in a short period is not beneficial and can cause dangerous dilution of blood sodium, known as hyponatraemia. Alkaline, structured and hydrogen-rich waters have not been shown to treat or prevent disease, because the body regulates blood pH tightly regardless of what is drunk.`,
+  },
+  {
+    title: "WHO: Sleep, rest and health",
+    url: "https://www.who.int/news-room/fact-sheets/detail/healthy-diet",
+    topicTags: ["sleep", "mental-health"],
+    text: `Adequate sleep supports immune function, cardiovascular health, metabolic regulation and mental health. Persistently short sleep is associated with increased risk of obesity, diabetes, hypertension and depression. Sleep cannot be reliably caught up in a single long weekend sleep. Sleeping tablets are intended for short-term use under medical supervision and are not a long-term solution for insomnia, for which behavioural approaches are first-line. Alcohol may shorten the time taken to fall asleep but degrades sleep quality later in the night, so it is not a sleep aid.`,
+  },
+  {
+    title: "Malaysia MOH: When to seek urgent medical care",
+    url: "https://www.moh.gov.my/",
+    topicTags: ["emergency", "traditional-medicine"],
+    text: `Symptoms that require immediate medical attention include difficulty breathing, chest pain, severe or persistent abdominal pain, persistent vomiting, bleeding that does not stop, sudden weakness or numbness on one side of the body, difficulty speaking, seizures, high fever with confusion, and reduced consciousness. Delaying hospital care in order to try a home or traditional remedy first is a common and serious cause of preventable harm. Traditional treatment may be used alongside conventional care, but it should be disclosed to the treating doctor and must never replace urgent assessment.`,
+  },
 ];
 
 async function main() {

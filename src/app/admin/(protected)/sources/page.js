@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, PillButton, SectionLabel } from "@/components/Card";
 
 const EMPTY_FORM = { title: "", text: "", url: "", topicTags: "" };
@@ -15,6 +15,18 @@ export default function AdminSourcesPage() {
   const [formError, setFormError] = useState("");
   const [reembedding, setReembedding] = useState(false);
   const [reembedResult, setReembedResult] = useState("");
+  const [query, setQuery] = useState("");
+
+  // Searches title, body text and topic tags together. The body matters most:
+  // an admin checking "do we already cover insulin?" is asking about the
+  // content, and that phrase may appear nowhere in the title.
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q || !sources) return sources || [];
+    return sources.filter((s) =>
+      `${s.title} ${s.text} ${(s.topicTags || []).join(" ")}`.toLowerCase().includes(q)
+    );
+  }, [sources, query]);
 
   const load = useCallback(() => {
     fetch("/api/admin/sources")
@@ -205,6 +217,38 @@ export default function AdminSourcesPage() {
         </Card>
 
         <div className="mt-6 lg:mt-0">
+          {sources && sources.length > 0 && (
+            <div className="mb-3">
+              <div className="relative">
+                <label htmlFor="source-search" className="sr-only">
+                  Search trusted sources
+                </label>
+                <input
+                  id="source-search"
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search title, text, or tag…"
+                  className="field rounded-full pr-16"
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    className="label-tracked absolute inset-y-0 right-0 px-4 text-[10px] text-faint transition-colors hover:text-accent"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <p className="label-tracked mt-2 text-[10px] text-faint">
+                {query.trim()
+                  ? `${visible.length} of ${sources.length} sources`
+                  : `${sources.length} source${sources.length === 1 ? "" : "s"} in the knowledge base`}
+              </p>
+            </div>
+          )}
+
           {error && <p className="text-danger">{error}</p>}
           {!sources && !error && <p className="text-muted">Loading…</p>}
           {sources && sources.length === 0 && (
@@ -212,9 +256,16 @@ export default function AdminSourcesPage() {
               <p className="text-sm text-muted">No sources yet — add your first one.</p>
             </Card>
           )}
+          {sources && sources.length > 0 && visible.length === 0 && (
+            <Card className="text-center">
+              <p className="text-sm text-muted">
+                No sources match &ldquo;{query.trim()}&rdquo;.
+              </p>
+            </Card>
+          )}
 
           <div className="flex flex-col gap-2">
-            {sources?.map((s) => (
+            {visible.map((s) => (
               <Card key={s.id}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">

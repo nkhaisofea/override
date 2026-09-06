@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
+import { SPEECH_LOCALES } from "./i18n";
+
 // "Ask Vitaura" — speak the claim instead of typing it.
 //
 // Uses the browser's built-in Web Speech API, so there's no audio upload, no
@@ -14,14 +16,6 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 // a long message into a phone, and dictating a claim in Malay or Mandarin is
 // far faster than thumbing it in.
 
-// BCP-47 tags for the three supported languages. The recogniser needs a
-// region, not just a language — bare "ms" or "zh" is rejected or silently
-// falls back to the browser locale.
-const SPEECH_LOCALES = {
-  ms: "ms-MY",
-  en: "en-MY",
-  zh: "zh-CN",
-};
 
 const ERROR_MESSAGES = {
   "not-allowed": "Microphone access was blocked. Allow it in your browser settings to use voice.",

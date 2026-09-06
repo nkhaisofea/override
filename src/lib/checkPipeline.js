@@ -61,9 +61,30 @@ export async function runCheckPipeline({ text, language, sessionId, inputType = 
     sources: matched.map((m) => ({ title: m.title, text: m.text, url: m.url })),
   });
 
-  // 4. Blend the categorical verdict with the model's independent action-risk
+  // 4. Enforce grounding.
+  //
+  //    A verdict of true/false/misleading asserts that trusted evidence
+  //    settled the question. If retrieval returned nothing, no evidence
+  //    existed, so such a verdict can only have come from the model's own
+  //    general knowledge — exactly what this app promises never to do. The
+  //    system prompt forbids it, but a prompt is a request, not a guarantee,
+  //    so the pipeline enforces it: no sources means the verdict is
+  //    downgraded to "unverified" regardless of what the model returned.
+  //
+  //    This is also what makes the guarantee on the result page honest — every
+  //    true/false/misleading verdict now provably has at least one source
+  //    behind it.
+  const grounded = matched.length > 0;
+  const verdict = grounded ? result.verdict : "unverified";
+  if (!grounded && result.verdict !== "unverified") {
+    console.warn(
+      `[checkPipeline] downgraded "${result.verdict}" -> "unverified": no sources cleared the retrieval floor`
+    );
+  }
+
+  // 5. Blend the categorical verdict with the model's independent action-risk
   //    score — see lib/risk.js for why verdict alone is the wrong signal.
-  const riskLevel = deriveRiskLevel(result.verdict, result.actionRisk);
+  const riskLevel = deriveRiskLevel(verdict, result.actionRisk);
 
   // Which source to show under the verdict.
   //
@@ -76,18 +97,28 @@ export async function runCheckPipeline({ text, language, sessionId, inputType = 
   // question about protein shakes. A fact-checker citing a source that doesn't
   // support anything is worse than showing no source at all.
   const citedByModel = matched.find((m) => m.title === result.citedSourceTitle);
-  const topSource =
-    citedByModel || (result.verdict === "unverified" ? null : matched[0]) || null;
+  const topSource = citedByModel || (verdict === "unverified" ? null : matched[0]) || null;
   const sourceCitation = topSource
     ? { title: topSource.title, url: topSource.url }
     : null;
 
-  // 5. Save the check.
+  // Every source that cleared the retrieval floor, not just the headline one.
+  // A "false" verdict is an accusation, and showing the full evidence behind
+  // it — with the model's own pick flagged — is what makes it checkable rather
+  // than something the user has to take on faith.
+  const supportingSources = matched.map((m) => ({
+    title: m.title,
+    url: m.url || null,
+    score: typeof m.score === "number" ? Math.round(m.score * 1000) / 1000 : null,
+    citedByModel: citedByModel ? m.title === citedByModel.title : false,
+  }));
+
+  // 6. Save the check.
   const claimDoc = {
     text,
     language,
     inputType,
-    verdict: result.verdict,
+    verdict,
     riskLevel,
     evidenceConfidence: result.evidenceConfidence,
     actionRisk: result.actionRisk,
@@ -95,6 +126,7 @@ export async function runCheckPipeline({ text, language, sessionId, inputType = 
     claim: result.claim,
     sourceId: topSource?._id || null,
     sourceCitation,
+    supportingSources,
     // Carried onto the claim so auto-generated FAQ posts inherit a real topic
     // tag instead of falling back to the cited source's title.
     topicTags: topSource?.topicTags || [],
@@ -107,7 +139,7 @@ export async function runCheckPipeline({ text, language, sessionId, inputType = 
   };
   const inserted = await claims.insertOne(claimDoc);
 
-  // 6. Auto-FAQ clustering check — best-effort, never blocks the response.
+  // 7. Auto-FAQ clustering check — best-effort, never blocks the response.
   maybeCreateAutoFaq({ newClaimDoc: { _id: inserted.insertedId, ...claimDoc } }).catch(
     () => {}
   );
@@ -115,12 +147,13 @@ export async function runCheckPipeline({ text, language, sessionId, inputType = 
   return {
     id: inserted.insertedId.toString(),
     claim: result.claim,
-    verdict: result.verdict,
+    verdict,
     riskLevel,
     evidenceConfidence: result.evidenceConfidence,
     actionRisk: result.actionRisk,
     explanation: result.explanation,
     sourceCitation,
+    supportingSources,
     language,
   };
 }

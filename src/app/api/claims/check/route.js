@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { runCheckPipeline } from "@/lib/checkPipeline";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
+import { SUPPORTED_LANGUAGES } from "@/lib/i18n";
 import { GeminiError } from "@/lib/gemini";
 import { DatabaseUnavailableError } from "@/lib/mongodb";
 
 const MAX_CLAIM_LENGTH = 2000;
-const SUPPORTED_LANGUAGES = ["ms", "en", "zh"];
 
 export async function POST(request) {
   const ip = getClientIp(request);
