@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { getCollections } from "./mongodb";
 import { embedQuery, checkClaim } from "./gemini";
 import { topMatches, reorderByRank } from "./similarity";
@@ -140,9 +141,16 @@ export async function runCheckPipeline({ text, language, sessionId, inputType = 
   const inserted = await claims.insertOne(claimDoc);
 
   // 7. Auto-FAQ clustering check — best-effort, never blocks the response.
-  maybeCreateAutoFaq({ newClaimDoc: { _id: inserted.insertedId, ...claimDoc } }).catch(
-    () => {}
-  );
+  //
+  // This MUST be scheduled with `after()`, not left as a bare floating promise.
+  // A bare `maybeCreateAutoFaq(...)` promise is not registered with the runtime,
+  // so on a serverless/managed host the invocation is frozen or torn down the
+  // instant the response is sent and the clustering + faq_posts insert never
+  // finishes — the auto-FAQ simply never appears in production, even though it
+  // works in `next dev` where the Node process keeps running. `after()` extends
+  // the invocation lifetime (via waitUntil) until the callback settles.
+  const newClaimDoc = { _id: inserted.insertedId, ...claimDoc };
+  after(() => maybeCreateAutoFaq({ newClaimDoc }).catch(() => {}));
 
   return {
     id: inserted.insertedId.toString(),
