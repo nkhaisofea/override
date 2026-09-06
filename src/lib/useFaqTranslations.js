@@ -18,7 +18,12 @@ import { useUiLanguage } from "./uiLanguage";
  */
 export function useFaqTranslations(posts) {
   const { language } = useUiLanguage();
-  const [map, setMap] = useState({});
+  // Keyed by language, not one flat map. A flat map that merged every
+  // language's results would keep showing a post's Malay text after the reader
+  // switched to English: the English pass returns nothing for an
+  // English-original post, so a stale entry from the previous language would
+  // survive and never follow the interface language back.
+  const [byLanguage, setByLanguage] = useState({});
 
   // Stable identity for the effect: the set of ids plus the language. Using
   // the array itself would refetch on every render, since the FAQ page builds
@@ -38,7 +43,10 @@ export function useFaqTranslations(posts) {
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then((data) => {
         if (!cancelled && data?.translations) {
-          setMap((prev) => ({ ...prev, ...data.translations }));
+          setByLanguage((prev) => ({
+            ...prev,
+            [language]: { ...prev[language], ...data.translations },
+          }));
         }
       })
       .catch(() => {
@@ -52,6 +60,11 @@ export function useFaqTranslations(posts) {
     // closure and are consistent with it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
+
+  // Only the current language's translations are ever applied, so an entry
+  // whose original is already in that language falls straight through to its
+  // own wording instead of a leftover translation.
+  const map = byLanguage[language] || {};
 
   return {
     language,

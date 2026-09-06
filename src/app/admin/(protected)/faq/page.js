@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { Card, PillButton, SectionLabel } from "@/components/Card";
 import { VerdictBadge } from "@/components/StatusBadge";
+import { LANGUAGES } from "@/lib/i18n";
 
 const EMPTY_FORM = {
   title: "",
   body: "",
   sourceLink: "",
   topicTag: "",
+  language: "en",
   featured: false,
   unpublished: false,
   verdict: "",
@@ -48,6 +50,7 @@ export default function AdminFaqPage() {
       body: p.body,
       sourceLink: p.sourceLink || "",
       topicTag: p.topicTag || "",
+      language: p.language || "en",
       featured: !!p.featured,
       unpublished: !!p.unpublished,
       verdict: p.verdict || "",
@@ -100,6 +103,7 @@ export default function AdminFaqPage() {
         body: post.body,
         sourceLink: post.sourceLink || "",
         topicTag: post.topicTag || "",
+        language: post.language || "en",
         featured: !!post.featured,
         verdict: post.verdict || "",
         unpublished: !post.unpublished,
@@ -180,6 +184,27 @@ export default function AdminFaqPage() {
                 className="field"
               />
             </div>
+
+            <label className="block">
+              <span className="label-tracked mb-2 block text-[10px] text-muted">
+                Written in
+              </span>
+              <select
+                value={form.language}
+                onChange={(e) => setForm({ ...form, language: e.target.value })}
+                className="field"
+              >
+                {LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-[11px] leading-relaxed text-faint">
+                The language you are typing the title and answer in. Readers on
+                another interface language get it auto-translated from here.
+              </span>
+            </label>
 
             <fieldset>
               <legend className="label-tracked mb-2 text-[10px] text-muted">
